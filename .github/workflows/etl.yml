@@ -1,0 +1,115 @@
+name: ETL Legalizaciones Conaltura
+
+on:
+  # ── Disparo manual desde la interfaz de GitHub ──────────────────────────
+  # Para usar: ve a Actions → "ETL Legalizaciones Conaltura" → "Run workflow"
+  # Selecciona el modo: "muestra" (5 registros + verificación) o "completo"
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'Modo de ejecución'
+        required: true
+        default: 'muestra'
+        type: choice
+        options:
+          - muestra      # 5 registros + verificación de propiedades (sin escritura en BD)
+          - verify       # Solo verifica propiedades HubSpot (sin BD, sin datos)
+          - completo     # ETL completo de producción
+
+  # ── Ejecución automática cada 2 horas ───────────────────────────────────
+  schedule:
+    - cron: '0 */2 * * *'
+
+jobs:
+  etl:
+    name: >-
+      ${{ github.event_name == 'workflow_dispatch'
+          && format('ETL [{0}] — manual', inputs.modo)
+          || 'ETL [completo] — automático' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────
+      - name: 📥 Descargar repositorio
+        uses: actions/checkout@v4
+
+      # ── 2. Python 3.11 ───────────────────────────────────────────────────
+      - name: 🐍 Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # ── 3. Dependencias ───────────────────────────────────────────────────
+      - name: 📦 Instalar dependencias
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ── 4. Imprimir contexto de la corrida ─────────────────────────────
+      - name: 📋 Contexto de ejecución
+        run: |
+          echo "=================================================="
+          echo "🏢 CONALTURA — ETL LEGALIZACIONES"
+          echo "=================================================="
+          echo "Modo      : ${{ github.event.inputs.modo || 'completo' }}"
+          echo "Trigger   : ${{ github.event_name }}"
+          echo "Fecha UTC : $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Fecha COL : $(TZ='America/Bogota' date '+%Y-%m-%d %H:%M:%S COL')"
+          echo "=================================================="
+
+      # ── 5a. MODO MUESTRA ─────────────────────────────────────────────────
+      - name: 🔍 ETL — Modo Muestra (5 registros + verificación)
+        if: github.event.inputs.modo == 'muestra'
+        env:
+          HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
+        run: |
+          echo ""
+          echo "🔍 Ejecutando en MODO MUESTRA"
+          echo "   → Extrae 5 registros"
+          echo "   → Verifica propiedades de HubSpot"
+          echo "   → NO escribe en la base de datos"
+          echo ""
+          python etl_legalizaciones.py --muestra
+
+      # ── 5b. MODO VERIFY ──────────────────────────────────────────────────
+      - name: 🔍 ETL — Verificación de propiedades solamente
+        if: github.event.inputs.modo == 'verify'
+        env:
+          HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
+        run: |
+          echo ""
+          echo "🔍 Ejecutando en MODO VERIFY"
+          echo "   → Solo consulta propiedades de HubSpot"
+          echo "   → NO extrae registros, NO escribe en BD"
+          echo ""
+          python etl_legalizaciones.py --verify
+
+      # ── 5c. MODO COMPLETO (manual o automático) ──────────────────────────
+      - name: 🚀 ETL — Completo (extracción + transformación + carga)
+        if: >-
+          github.event_name == 'schedule' ||
+          github.event.inputs.modo == 'completo'
+        env:
+          HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
+          DB_HOST:         ${{ secrets.DB_HOST }}
+          DB_USER:         ${{ secrets.DB_USER }}
+          DB_PASSWORD:     ${{ secrets.DB_PASSWORD }}
+        run: |
+          echo ""
+          echo "🚀 Ejecutando ETL COMPLETO"
+          echo "   → Extrae TODAS las legalizaciones"
+          echo "   → Transforma y calcula tiempos"
+          echo "   → Carga a Neon (full reload)"
+          echo ""
+          python etl_legalizaciones.py
+
+      # ── 6. Resumen final ─────────────────────────────────────────────────
+      - name: ✅ Resumen de la corrida
+        if: always()
+        run: |
+          echo ""
+          echo "=================================================="
+          echo "✅ Corrida finalizada"
+          echo "Resultado: ${{ job.status }}"
+          echo "=================================================="
