@@ -14,6 +14,7 @@ on:
         options:
           - muestra      # 5 registros + verificación de propiedades (sin escritura en BD)
           - verify       # Solo verifica propiedades HubSpot (sin BD, sin datos)
+          - transform    # Extrae TODO + transforma + diagnóstico (sin escritura en BD)
           - completo     # ETL completo de producción
 
   # ── Ejecución automática cada 2 horas ───────────────────────────────────
@@ -85,7 +86,22 @@ jobs:
           echo ""
           python etl_legalizaciones.py --verify
 
-      # ── 5c. MODO COMPLETO (manual o automático) ──────────────────────────
+      # ── 5c. MODO TRANSFORM ───────────────────────────────────────────────
+      - name: 🔄 ETL — Transformación completa (sin carga a BD)
+        if: github.event.inputs.modo == 'transform'
+        env:
+          HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
+        run: |
+          echo ""
+          echo "🔄 Ejecutando en MODO TRANSFORM"
+          echo "   → Extrae TODAS las legalizaciones"
+          echo "   → Transforma y calcula tiempos"
+          echo "   → Imprime diagnóstico completo"
+          echo "   → NO escribe en la base de datos"
+          echo ""
+          python etl_legalizaciones.py --transform
+
+      # ── 5d. MODO COMPLETO (manual o automático) ──────────────────────────
       - name: 🚀 ETL — Completo (extracción + transformación + carga)
         if: >-
           github.event_name == 'schedule' ||
