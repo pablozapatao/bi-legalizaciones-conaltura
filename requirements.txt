@@ -1,0 +1,17 @@
+# ==========================================
+# CONALTURA ETL Legalizaciones — Dependencias Python
+# ==========================================
+
+# HTTP
+requests>=2.31.0
+
+# Data
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Base de datos (Neon / Postgres)
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.9
+
+# Utilidades de fecha
+python-dateutil>=2.8.2
