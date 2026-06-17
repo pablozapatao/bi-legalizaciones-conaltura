@@ -319,47 +319,94 @@ export default function Dashboard() {
               ║ 1. KPI CARDS                                        ║
               ╚══════════════════════════════════════════════════════╝ */}
           <section>
-            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
               <div className="sec-bar"/>
               <div>
-                <h2 style={{fontFamily:FD,fontSize:13,fontWeight:700,color:P.teal,margin:0}}>Resolución del mes</h2>
-                <p style={{fontSize:10,color:'rgba(18,81,96,.5)',marginTop:2,fontFamily:FB}}>Legalizaciones con fecha de aprobación en {MES_F[mes]} {anio}</p>
+                <h2 style={{fontFamily:'Syne,var(--font-syne),sans-serif',fontSize:14,fontWeight:700,color:P.teal,margin:0,letterSpacing:'-.01em'}}>Resolución del mes</h2>
+                <p style={{fontSize:10,color:'rgba(18,81,96,.5)',marginTop:2}}>Legalizaciones con fecha de aprobación en {MES_F[mes]} {anio}</p>
               </div>
             </div>
 
-            {!kpis?<div className="shimmer" style={{height:220}}/>:(()=>{
-              const apr = kpis.aprobadas_exitoso+kpis.aprobadas_novedades
-              return (
-                <div style={{display:'grid',gridTemplateColumns:'196px 1fr',gap:14}}>
-                  {/* Gauge */}
-                  <div className="card" style={{padding:18,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
-                    <p style={{fontSize:9,fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',opacity:.4,textAlign:'center',marginBottom:6,fontFamily:FB}}>Cumplimiento vs meta</p>
-                    <Gauge pct={kpis.pct_cumplimiento} meta={kpis.meta_negocios} onEdit={()=>setMeta(true)}/>
-                  </div>
-                  {/* 6 KPI cards */}
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
-                    {[
-                      {l:'Total del mes',    v:kpis.total_resolucion,    col:P.teal,   sub:`${apr} aprobadas · ${kpis.rechazadas} rechazadas`},
-                      {l:'Aprobadas ✓',      v:kpis.aprobadas_exitoso,   col:P.green,  sub:apr>0?`${((kpis.aprobadas_exitoso/apr)*100).toFixed(0)}% de las aprobadas`:undefined},
-                      {l:'Con novedades',    v:kpis.aprobadas_novedades, col:P.amber,  sub:apr>0?`${((kpis.aprobadas_novedades/apr)*100).toFixed(0)}% de las aprobadas`:undefined},
-                      {l:'Rechazadas',       v:kpis.rechazadas,          col:kpis.rechazadas>0?P.coral:P.teal, sub:undefined},
-                      {l:'Ventas caídas',    v:kpis.ventas_caidas,       col:kpis.ventas_caidas>0?P.red:P.teal, sub:undefined},
-                      {l:'Ventana cierre',   v:`${kpis.pct_ventana_cierre}%`, col:kpis.pct_ventana_cierre>40?P.amber:P.teal,
-                        sub:`${kpis.en_ventana_cierre} aprobadas en días límite`},
-                    ].map(k=>(
-                      <div key={k.l} className="card kpi-card" style={{padding:'15px 16px',position:'relative',overflow:'hidden',transition:'all .2s'}}>
-                        <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${k.col},transparent)`,borderRadius:'14px 14px 0 0'}}/>
-                        <p style={{fontSize:9,fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',opacity:.45,marginBottom:8,lineHeight:1.4,fontFamily:FB}}>{k.l}</p>
-                        <p style={{fontFamily:FD,fontSize:30,fontWeight:800,color:k.col,margin:0,lineHeight:1,letterSpacing:'-.02em'}}>
-                          {typeof k.v==='number'?fmt(k.v):k.v}
+            {!kpis
+              ? <div className="shimmer" style={{height:230,borderRadius:14}}/>
+              : (()=>{
+                  const apr = kpis.aprobadas_exitoso + kpis.aprobadas_novedades
+                  const cards = [
+                    {l:'Total del mes',       v:kpis.total_resolucion,    col:P.teal,  sub:`${apr} aprobadas · ${kpis.rechazadas} rechazadas`},
+                    {l:'Aprobadas sin novedad',v:kpis.aprobadas_exitoso,  col:P.green, sub:apr>0?`${((kpis.aprobadas_exitoso/apr)*100).toFixed(0)}% de las aprobadas`:undefined},
+                    {l:'Aprobadas con novedad',v:kpis.aprobadas_novedades,col:P.amber, sub:apr>0?`${((kpis.aprobadas_novedades/apr)*100).toFixed(0)}% de las aprobadas`:undefined},
+                    {l:'Rechazadas',           v:kpis.rechazadas,          col:kpis.rechazadas>0?P.coral:P.teal, sub:undefined},
+                    {l:'Ventas caídas',         v:kpis.ventas_caidas,       col:kpis.ventas_caidas>0?P.red:P.teal, sub:undefined},
+                    {l:'En ventana de cierre',  v:`${kpis.pct_ventana_cierre}%`, col:kpis.pct_ventana_cierre>40?P.amber:P.teal, sub:`${kpis.en_ventana_cierre} aprobadas en últimos días del mes`},
+                  ]
+                  return (
+                    <div style={{display:'grid',gridTemplateColumns:'210px 1fr',gap:14}}>
+
+                      {/* ── GAUGE ─────────────────────────────────── */}
+                      <div className="card" style={{padding:'20px 16px',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:0}}>
+                        <p style={{fontSize:9,fontWeight:700,textTransform:'uppercase',letterSpacing:'.09em',color:'rgba(18,81,96,.4)',textAlign:'center',marginBottom:8}}>
+                          Cumplimiento vs meta
                         </p>
-                        {k.sub&&<p style={{fontSize:10,marginTop:6,opacity:.5,lineHeight:1.4,fontFamily:FB}}>{k.sub}</p>}
+                        <Gauge pct={kpis.pct_cumplimiento} meta={kpis.meta_negocios} onEdit={()=>setMeta(true)}/>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })()}
+
+                      {/* ── 6 KPI CARDS ───────────────────────────── */}
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+                        {cards.map(k=>(
+                          <div key={k.l} style={{
+                            background:'white',
+                            borderRadius:14,
+                            border:'1px solid rgba(18,81,96,.08)',
+                            boxShadow:'0 1px 3px rgba(18,81,96,.06)',
+                            padding:'16px 18px',
+                            position:'relative',
+                            overflow:'hidden',
+                            transition:'box-shadow .2s, transform .2s',
+                          }}>
+                            {/* Accent line top */}
+                            <div style={{position:'absolute',top:0,left:0,right:0,height:3,borderRadius:'14px 14px 0 0',background:`linear-gradient(90deg,${k.col},transparent)`}}/>
+                            {/* Label */}
+                            <p style={{
+                              fontSize:10,
+                              fontWeight:600,
+                              textTransform:'uppercase',
+                              letterSpacing:'.07em',
+                              color:'rgba(18,81,96,.45)',
+                              marginBottom:10,
+                              marginTop:4,
+                              lineHeight:1.35,
+                              fontFamily:'Inter,var(--font-inter),-apple-system,sans-serif',
+                            }}>{k.l}</p>
+                            {/* Number — Syne 800 forzado */}
+                            <p style={{
+                              fontFamily:'Syne,var(--font-syne),sans-serif',
+                              fontSize:38,
+                              fontWeight:800,
+                              color:k.col,
+                              margin:0,
+                              lineHeight:1,
+                              letterSpacing:'-.03em',
+                              fontVariantNumeric:'tabular-nums',
+                            }}>
+                              {typeof k.v==='number' ? fmt(k.v) : k.v}
+                            </p>
+                            {/* Subtext */}
+                            {k.sub && (
+                              <p style={{
+                                fontSize:10,
+                                marginTop:8,
+                                color:'rgba(18,81,96,.5)',
+                                lineHeight:1.45,
+                                fontFamily:'Inter,var(--font-inter),-apple-system,sans-serif',
+                              }}>{k.sub}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()
+            }
           </section>
 
           {/* ╔══════════════════════════════════════════════════════╗
