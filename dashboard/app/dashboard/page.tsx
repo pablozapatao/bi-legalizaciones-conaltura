@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  AreaChart, Area, BarChart, Bar,
+  AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 
@@ -26,8 +26,8 @@ const T = {
 }
 
 // Tipografía: Syne para display, Inter para cuerpo
-const FONT_D = `'Syne', -apple-system, sans-serif`
-const FONT_B = `'Inter', -apple-system, sans-serif`
+const FONT_D = `var(--font-syne), 'Syne', -apple-system, sans-serif`
+const FONT_B = `var(--font-inter), 'Inter', -apple-system, sans-serif`
 
 // Sombra card estándar
 const shadow = '0 1px 3px rgba(15,51,64,0.07), 0 1px 2px rgba(15,51,64,0.04)'
@@ -116,163 +116,35 @@ function Badge({c}:{c:string}) {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// MAPA DE COLOMBIA — D3 UMD + topojson UMD (cargados como scripts)
-// Usamos cdnjs (UMD builds) para evitar el error de ESM en Next.js.
 // ══════════════════════════════════════════════════════════════════════
-
-// Carga un script externo una sola vez y resuelve la promesa cuando carga
-function loadScript(src: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return }
-    const s = document.createElement('script')
-    s.src = src; s.onload = () => resolve(); s.onerror = reject
-    document.head.appendChild(s)
-  })
-}
-
-function MapaColombia({ ciudades }: { ciudades: any[] }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [hov, setHov] = useState<string|null>(null)
-  const [met, setMet] = useState<'aprobadas'|'pipeline_activo'|'ventas_caidas'>('aprobadas')
-
-  useEffect(() => {
-    let cancelled = false
-    if (!ref.current) return
-
-    const render = async () => {
-      try {
-        // Cargar D3 y topojson UMD desde cdnjs (allowlist del browser)
-        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js')
-        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js')
-        if (cancelled || !ref.current) return
-
-        const d3 = (window as any).d3
-        const topojson = (window as any).topojson
-        if (!d3 || !topojson) throw new Error('libs not loaded')
-
-        const topo = await d3.json('https://cdn.jsdelivr.net/npm/datamaps@0.5.10/src/js/data/col.topo.json')
-        if (cancelled || !ref.current) return
-
-        ref.current.innerHTML = ''
-
-        const W=300, H=420
-        const features = topojson.feature(topo, topo.objects.col).features
-        const proj = d3.geoMercator().fitSize([W,H], {type:'FeatureCollection',features})
-        const path = d3.geoPath(proj)
-
-        const svg = d3.select(ref.current)
-          .append('svg').attr('width',W).attr('height',H)
-          .attr('viewBox',`0 0 ${W} ${H}`)
-
-        svg.selectAll('path').data(features).join('path')
-          .attr('d', path)
-          .attr('fill', T.beigeD)
-          .attr('stroke', 'rgba(18,81,96,0.18)')
-          .attr('stroke-width', 0.8)
-
-        const coords: Record<string,[number,number]> = {
-          'Barranquilla':[-74.796,10.979], 'Cartagena':[-75.512,10.391],
-          'Medellín':[-75.563,6.252], 'Bogotá':[-74.072,4.711], 'Cali':[-76.532,3.451],
-        }
-        const maxV = Math.max(...ciudades.map(c=>c[met]||0), 1)
-        const metColor: Record<string,string> = {aprobadas:T.teal, pipeline_activo:T.teal2, ventas_caidas:T.red}
-
-        ciudades.forEach((c: any) => {
-          const xy = coords[c.ciudad]
-          if (!xy) return
-          const [px,py] = proj(xy) as [number,number]
-          const val = c[met]||0
-          const r = val>0 ? Math.max(10,Math.min(32,(val/maxV)*32)) : 6
-          const col = metColor[met]
-
-          svg.append('circle').attr('cx',px).attr('cy',py).attr('r',r)
-            .attr('fill',col).attr('opacity', val>0?0.75:0.2)
-            .attr('cursor','pointer')
-            .on('mouseenter', function(this: any) {
-              d3.select(this).attr('opacity',0.95).attr('r',r+3)
-              setHov(c.ciudad)
-            })
-            .on('mouseleave', function(this: any) {
-              d3.select(this).attr('opacity',val>0?0.75:0.2).attr('r',r)
-              setHov(null)
-            })
-
-          if (r>=14) {
-            svg.append('text').attr('x',px).attr('y',py+4)
-              .attr('text-anchor','middle').attr('font-size',10).attr('font-weight','700')
-              .attr('font-family',FONT_D).attr('fill','white').attr('pointer-events','none')
-              .text(val)
-          }
-        })
-      } catch(e) {
-        if (ref.current) ref.current.innerHTML = '<p style="padding:16px;opacity:.4;font-size:12px">Cargando mapa…</p>'
-      }
-    }
-    render()
-    return () => { cancelled = true }
-  }, [ciudades, met])
-
-  const metaBtns = [{k:'aprobadas' as const,l:'Aprobadas',c:T.teal},{k:'pipeline_activo' as const,l:'En proceso',c:T.teal2},{k:'ventas_caidas' as const,l:'Caídas',c:T.red}]
-
+// TABLA DE CIUDADES — reemplaza el mapa eliminado
+// ══════════════════════════════════════════════════════════════════════
+function TablaCiudades({ ciudades }: { ciudades: any[] }) {
   return (
-    <div>
-      <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
-        {metaBtns.map(b=>(
-          <button key={b.k} onClick={()=>setMet(b.k)} style={{
-            fontSize:11,fontWeight:600,padding:'5px 14px',borderRadius:99,border:'none',cursor:'pointer',
-            fontFamily:FONT_B,
-            background:met===b.k?b.c:T.beigeD,
-            color:met===b.k?T.white:'rgba(18,81,96,0.65)',
-          }}>{b.l}</button>
-        ))}
-      </div>
-      <div style={{display:'flex',gap:24,alignItems:'flex-start',flexWrap:'wrap'}}>
-        {/* SVG map container */}
-        <div ref={ref} style={{position:'relative',flexShrink:0,minWidth:200,minHeight:280}}/>
-
-        {/* Tooltip flotante */}
-        {hov && (() => {
-          const c = ciudades.find(x=>x.ciudad===hov); if (!c) return null
-          return (
-            <div style={{position:'absolute',background:T.white,borderRadius:10,padding:'12px 16px',
-              border:`1px solid rgba(18,81,96,0.12)`,boxShadow:shadow,minWidth:160,fontSize:13,zIndex:20}}>
-              <p style={{fontWeight:700,marginBottom:8,color:T.teal,fontFamily:FONT_D}}>{c.ciudad}</p>
-              {[['Aprobadas',c.aprobadas,T.green],['En proceso',c.pipeline_activo,T.teal],
-                ['Caídas',c.ventas_caidas,T.red],['Lead time prom.',fD(c.avg_lead_time),'rgba(18,81,96,0.5)']
-              ].map(([l,v,col])=>(
-                <div key={l as string} style={{display:'flex',justifyContent:'space-between',gap:16,marginBottom:4}}>
-                  <span style={{opacity:.55,fontSize:12}}>{l}</span>
-                  <span style={{fontWeight:600,color:col as string}}>{typeof v==='number'?fN(v):v}</span>
-                </div>
-              ))}
-            </div>
-          )
-        })()}
-
-        {/* Tabla ciudades */}
-        <div style={{flex:1,minWidth:220}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,fontFamily:FONT_B}}>
-            <thead>
-              <tr>{['Ciudad','Aprobadas','En proceso','Caídas'].map(h=>(
-                <th key={h} style={{padding:'8px 10px',textAlign:h==='Ciudad'?'left':'right',
-                  fontSize:10,fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em',
-                  opacity:.5,borderBottom:`1.5px solid rgba(18,81,96,0.1)`}}>{h}</th>
-              ))}</tr>
-            </thead>
-            <tbody>
-              {[...ciudades].sort((a,b)=>b.aprobadas-a.aprobadas).map(c=>(
-                <tr key={c.ciudad} style={{borderBottom:`1px solid rgba(18,81,96,0.055)`,
-                  background:hov===c.ciudad?'rgba(18,81,96,0.04)':undefined}}>
-                  <td style={{padding:'9px 10px',fontWeight:600}}>{c.ciudad}</td>
-                  <td style={{padding:'9px 10px',textAlign:'right',fontWeight:700,color:T.green}}>{fN(c.aprobadas)}</td>
-                  <td style={{padding:'9px 10px',textAlign:'right'}}>{fN(c.pipeline_activo)}</td>
-                  <td style={{padding:'9px 10px',textAlign:'right',color:c.ventas_caidas>0?T.red:undefined}}>{fN(c.ventas_caidas)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+    <div style={{overflowX:'auto'}}>
+      <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,fontFamily:FONT_B}}>
+        <thead>
+          <tr style={{background:T.beigeD}}>
+            {['Ciudad','Aprobadas','En proceso','Caídas','Lead time'].map(h=>(
+              <th key={h} style={{padding:'10px 14px',textAlign:h==='Ciudad'?'left':'right',
+                fontSize:10,fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em',
+                opacity:.55,borderBottom:`1.5px solid rgba(18,81,96,0.1)`,color:T.teal}}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {[...ciudades].sort((a,b)=>b.aprobadas-a.aprobadas).map((c,i)=>(
+            <tr key={c.ciudad} style={{borderBottom:`1px solid rgba(18,81,96,0.055)`,
+              background:i%2===0?T.white:'rgba(244,240,229,0.35)'}}>
+              <td style={{padding:'11px 14px',fontWeight:700}}>{c.ciudad}</td>
+              <td style={{padding:'11px 14px',textAlign:'right',fontWeight:700,color:T.green}}>{fN(c.aprobadas)}</td>
+              <td style={{padding:'11px 14px',textAlign:'right',color:T.teal2}}>{fN(c.pipeline_activo)}</td>
+              <td style={{padding:'11px 14px',textAlign:'right',color:c.ventas_caidas>0?T.red:undefined}}>{fN(c.ventas_caidas)}</td>
+              <td style={{padding:'11px 14px',textAlign:'right',opacity:.65}}>{fD(c.avg_lead_time)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -400,12 +272,12 @@ export default function Dashboard() {
   let pa=h.y,pm=h.m
   for(let i=0;i<18;i++){periodos.push({y:pa,m:pm,l:`${MES[pm]} ${pa}`});pm--;if(pm<1){pm=12;pa--}}
 
+  const STAGE_COLORS = [T.teal, T.teal2, T.teal3, T.teal4]
   const canalColors=['#125160','#1a6b7a','#1a7d6e','#279752','#4d7c0f','#166534']
 
   return (
     <div style={{minHeight:'100vh',background:T.beige,fontFamily:FONT_B,color:T.teal}}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
         @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
         *{box-sizing:border-box}
         ::-webkit-scrollbar{width:4px;height:4px}
@@ -641,7 +513,7 @@ export default function Dashboard() {
                   if(s.count===0) return null
                   return (
                     <div key={s.etapa_codigo} style={{
-                      flex:s.count,minWidth:4,background:T.stage?.[i]||T.teal,
+                      flex:s.count,minWidth:4,background:STAGE_COLORS[i]||T.teal,
                       display:'flex',alignItems:'center',justifyContent:'center',
                       transition:'flex .8s cubic-bezier(.4,0,.2,1)'}}>
                       {s.pct_del_total>8&&<span style={{color:T.white,fontSize:15,fontFamily:FONT_D,fontWeight:700}}>{s.count}</span>}
@@ -655,10 +527,10 @@ export default function Dashboard() {
                 {(pipe.stages||[]).map((s:any,i:number)=>(
                   <div key={s.etapa_codigo}>
                     <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
-                      <div style={{width:10,height:10,borderRadius:3,background:T.stage?.[i]||T.teal,flexShrink:0}}/>
+                      <div style={{width:10,height:10,borderRadius:3,background:STAGE_COLORS[i]||T.teal,flexShrink:0}}/>
                       <span style={{fontSize:11,fontWeight:600,fontFamily:FONT_B}}>{s.etapa_label}</span>
                     </div>
-                    <p style={{fontFamily:FONT_D,fontSize:28,fontWeight:800,color:T.stage?.[i]||T.teal,margin:'4px 0 2px'}}>{fN(s.count)}</p>
+                    <p style={{fontFamily:FONT_D,fontSize:28,fontWeight:800,color:STAGE_COLORS[i]||T.teal,margin:'4px 0 2px'}}>{fN(s.count)}</p>
                     <p style={{fontSize:11,opacity:.45,fontFamily:FONT_B}}>{s.pct_del_total}% del total{s.aging_promedio!=null?` · ${s.aging_promedio}d prom.`:''}</p>
                   </div>
                 ))}
@@ -805,13 +677,13 @@ export default function Dashboard() {
         </section>
 
         {/* ═══════════════════════════════════════════════════════════
-            6. MAPA COLOMBIA
+            6. CIUDADES
         ═══════════════════════════════════════════════════════════ */}
         <section style={{marginBottom:48}}>
           <SH title="Distribución geográfica" sub="¿Dónde ocurren las legalizaciones?"/>
-          {!mapa?<Sk h={320}/>:(
-            <Card>
-              <MapaColombia ciudades={mapa.ciudades||[]}/>
+          {!mapa?<Sk h={200}/>:(
+            <Card p={0}>
+              <TablaCiudades ciudades={mapa.ciudades||[]}/>
             </Card>
           )}
         </section>
