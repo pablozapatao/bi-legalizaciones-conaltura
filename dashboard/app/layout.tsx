@@ -9,7 +9,6 @@ const syne = Syne({
   weight: ['400', '600', '700', '800'],
   display: 'swap',
 })
-
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
@@ -25,19 +24,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={`${syne.variable} ${inter.variable}`}>
-      <body style={{ margin: 0, padding: 0 }}>
+      <body>
         {children}
-        <Toaster
-          position="bottom-right"
-          toastOptions={{
-            style: {
-              background: '#125160',
-              color: '#F4F0E5',
-              fontSize: '0.875rem',
-              borderRadius: '8px',
-            },
-          }}
-        />
+        <Toaster position="bottom-right" toastOptions={{
+          style: { background: '#125160', color: '#F4F0E5', fontSize: '0.875rem', borderRadius: '8px' },
+        }}/>
       </body>
     </html>
   )
