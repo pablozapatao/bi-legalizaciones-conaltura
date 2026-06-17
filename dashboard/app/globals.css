@@ -17,13 +17,15 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body { height: 100%; overflow: hidden; }
-
+/* Layout: the outer div uses height:100vh + overflow:hidden — not body */
+html { height: 100%; }
 body {
-  font-family: var(--font-inter, 'Inter', -apple-system, sans-serif);
+  height: 100%;
+  font-family: 'Inter', var(--font-inter), -apple-system, sans-serif;
   background: var(--beige);
   color: var(--primary);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* ── Glass card ─────────────────────────────────────────────────────── */
@@ -34,12 +36,12 @@ body {
   box-shadow: 0 1px 3px rgba(18,81,96,0.07);
 }
 
-/* ── BI table — espejo exacto del BI de Deals ─────────────────────── */
+/* ── BI table ─────────────────────────────────────────────────────── */
 .bi-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
-  font-family: var(--font-inter, Inter, -apple-system, sans-serif);
+  font-family: 'Inter', var(--font-inter), -apple-system, sans-serif;
 }
 .bi-table thead {
   background: #125160;
@@ -53,10 +55,11 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .1em;
-  color: rgba(244,240,229,.55);
+  color: rgba(244,240,229,.5);
   border-bottom: 1px solid rgba(255,255,255,.06);
 }
-.bi-table thead tr:last-child th {
+.bi-table thead tr:last-child th,
+.bi-table thead tr:only-child th {
   padding: 7px 10px;
   font-size: 10px;
   font-weight: 600;
@@ -68,17 +71,16 @@ body {
   user-select: none;
   border-bottom: 2px solid rgba(255,255,255,.08);
 }
-.bi-table thead th:hover { color: #A1D81A; }
+.bi-table thead th:hover  { color: #A1D81A; }
 .bi-table thead th.sorted { color: #A1D81A; }
 
 .bi-table tbody tr {
   border-bottom: 1px solid rgba(18,81,96,.055);
   transition: background .12s;
 }
-.bi-table tbody tr:hover { background: rgba(18,81,96,.035) !important; }
-.bi-table tbody tr:nth-child(even) { background: rgba(244,240,229,.45); }
-.bi-table tbody tr:nth-child(odd)  { background: white; }
-
+.bi-table tbody tr:hover         { background: rgba(18,81,96,.04) !important; }
+.bi-table tbody tr:nth-child(even){ background: rgba(244,240,229,.5); }
+.bi-table tbody tr:nth-child(odd) { background: white; }
 .bi-table td {
   padding: 8px 10px;
   vertical-align: middle;
@@ -96,22 +98,20 @@ body {
   color: rgba(244,240,229,.7);
 }
 
-/* ── Shimmer ─────────────────────────────────────────────────────────── */
+/* ── Shimmer ─────────────────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
 }
 .shimmer {
   background: linear-gradient(90deg,
-    rgba(18,81,96,.05) 25%,
-    rgba(18,81,96,.10) 50%,
-    rgba(18,81,96,.05) 75%);
+    rgba(18,81,96,.05) 25%, rgba(18,81,96,.10) 50%, rgba(18,81,96,.05) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.6s ease infinite;
   border-radius: 8px;
 }
 
-/* ── Sec-bar accent ───────────────────────────────────────────────────── */
+/* ── Sec-bar accent ─────────────────────────────────────────────── */
 .sec-bar {
   width: 4px;
   height: 22px;
@@ -120,10 +120,13 @@ body {
   flex-shrink: 0;
 }
 
-/* ── KPI hover ─────────────────────────────────────────────────────── */
-.kpi-card:hover { box-shadow: 0 4px 16px rgba(18,81,96,.12); transform: translateY(-1px); }
+/* ── KPI hover ──────────────────────────────────────────────────── */
+.kpi-card:hover {
+  box-shadow: 0 6px 20px rgba(18,81,96,.12) !important;
+  transform: translateY(-2px);
+}
 
-/* ── Input ─────────────────────────────────────────────────────────── */
+/* ── Input (sidebar) ─────────────────────────────────────────────── */
 .inp {
   width: 100%;
   padding: 7px 11px;
@@ -137,18 +140,7 @@ body {
 }
 .inp:focus { border-color: #A1D81A; }
 
-/* ── Badge ────────────────────────────────────────────────────────── */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 9px;
-  border-radius: 99px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-/* ── Live dot ─────────────────────────────────────────────────────── */
+/* ── Live dot ───────────────────────────────────────────────────── */
 @keyframes pulse-ring {
   0%   { transform: scale(.9); box-shadow: 0 0 0 0 rgba(161,216,26,.5); }
   70%  { transform: scale(1);  box-shadow: 0 0 0 6px rgba(161,216,26,0); }
@@ -160,6 +152,9 @@ body {
   animation: pulse-ring 2s ease infinite;
 }
 
-/* ── Scrollbar ───────────────────────────────────────────────────── */
+/* ── Spin ───────────────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Scrollbar ─────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-thumb { background: rgba(18,81,96,.22); border-radius: 99px; }
