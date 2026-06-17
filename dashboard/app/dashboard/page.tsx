@@ -23,7 +23,7 @@ const P = {
   white:   '#ffffff',
   stage:   ['#125160','#1a6b7a','#1a7d6e','#279752'],
 }
-const FD = `var(--font-syne,'Syne',sans-serif)`
+const FD = `-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`
 const FB = `var(--font-inter,'Inter',-apple-system,sans-serif)`
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -322,7 +322,7 @@ export default function Dashboard() {
             <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
               <div className="sec-bar"/>
               <div>
-                <h2 style={{fontFamily:'Syne,var(--font-syne),sans-serif',fontSize:14,fontWeight:700,color:P.teal,margin:0,letterSpacing:'-.01em'}}>Resolución del mes</h2>
+                <h2 style={{fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif',fontSize:14,fontWeight:700,color:P.teal,margin:0,letterSpacing:'-.01em'}}>Resolución del mes</h2>
                 <p style={{fontSize:10,color:'rgba(18,81,96,.5)',marginTop:2}}>Legalizaciones con fecha de aprobación en {MES_F[mes]} {anio}</p>
               </div>
             </div>
@@ -379,7 +379,7 @@ export default function Dashboard() {
                             }}>{k.l}</p>
                             {/* Number — Syne 800 forzado */}
                             <p style={{
-                              fontFamily:'Syne,var(--font-syne),sans-serif',
+                              fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif',
                               fontSize:38,
                               fontWeight:800,
                               color:k.col,
