@@ -116,8 +116,20 @@ function Badge({c}:{c:string}) {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// MAPA DE COLOMBIA — D3 + topojson real
+// MAPA DE COLOMBIA — D3 UMD + topojson UMD (cargados como scripts)
+// Usamos cdnjs (UMD builds) para evitar el error de ESM en Next.js.
 // ══════════════════════════════════════════════════════════════════════
+
+// Carga un script externo una sola vez y resuelve la promesa cuando carga
+function loadScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return }
+    const s = document.createElement('script')
+    s.src = src; s.onload = () => resolve(); s.onerror = reject
+    document.head.appendChild(s)
+  })
+}
+
 function MapaColombia({ ciudades }: { ciudades: any[] }) {
   const ref = useRef<HTMLDivElement>(null)
   const [hov, setHov] = useState<string|null>(null)
@@ -125,17 +137,18 @@ function MapaColombia({ ciudades }: { ciudades: any[] }) {
 
   useEffect(() => {
     let cancelled = false
-    const el = ref.current
-    if (!el) return
+    if (!ref.current) return
 
     const render = async () => {
       try {
-        const [d3mod, tpmod] = await Promise.all([
-          import('https://cdn.jsdelivr.net/npm/d3@7/+esm' as any),
-          import('https://cdn.jsdelivr.net/npm/topojson-client@3/+esm' as any),
-        ])
-        const d3 = d3mod as any, topojson = tpmod as any
+        // Cargar D3 y topojson UMD desde cdnjs (allowlist del browser)
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js')
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js')
         if (cancelled || !ref.current) return
+
+        const d3 = (window as any).d3
+        const topojson = (window as any).topojson
+        if (!d3 || !topojson) throw new Error('libs not loaded')
 
         const topo = await d3.json('https://cdn.jsdelivr.net/npm/datamaps@0.5.10/src/js/data/col.topo.json')
         if (cancelled || !ref.current) return
@@ -157,15 +170,14 @@ function MapaColombia({ ciudades }: { ciudades: any[] }) {
           .attr('stroke', 'rgba(18,81,96,0.18)')
           .attr('stroke-width', 0.8)
 
-        // Pintar ciudades con burbujas
         const coords: Record<string,[number,number]> = {
           'Barranquilla':[-74.796,10.979], 'Cartagena':[-75.512,10.391],
           'Medellín':[-75.563,6.252], 'Bogotá':[-74.072,4.711], 'Cali':[-76.532,3.451],
         }
         const maxV = Math.max(...ciudades.map(c=>c[met]||0), 1)
-        const metColor = {aprobadas:T.teal, pipeline_activo:T.teal2, ventas_caidas:T.red}
+        const metColor: Record<string,string> = {aprobadas:T.teal, pipeline_activo:T.teal2, ventas_caidas:T.red}
 
-        ciudades.forEach(c => {
+        ciudades.forEach((c: any) => {
           const xy = coords[c.ciudad]
           if (!xy) return
           const [px,py] = proj(xy) as [number,number]
@@ -176,11 +188,11 @@ function MapaColombia({ ciudades }: { ciudades: any[] }) {
           svg.append('circle').attr('cx',px).attr('cy',py).attr('r',r)
             .attr('fill',col).attr('opacity', val>0?0.75:0.2)
             .attr('cursor','pointer')
-            .on('mouseenter', function() {
+            .on('mouseenter', function(this: any) {
               d3.select(this).attr('opacity',0.95).attr('r',r+3)
               setHov(c.ciudad)
             })
-            .on('mouseleave', function() {
+            .on('mouseleave', function(this: any) {
               d3.select(this).attr('opacity',val>0?0.75:0.2).attr('r',r)
               setHov(null)
             })
@@ -193,8 +205,7 @@ function MapaColombia({ ciudades }: { ciudades: any[] }) {
           }
         })
       } catch(e) {
-        // fallback silencioso
-        if (ref.current) ref.current.innerHTML = '<p style="padding:16px;opacity:.4;font-size:12px">Mapa no disponible</p>'
+        if (ref.current) ref.current.innerHTML = '<p style="padding:16px;opacity:.4;font-size:12px">Cargando mapa…</p>'
       }
     }
     render()
