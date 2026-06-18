@@ -636,18 +636,19 @@ export default function Dashboard() {
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
               {!kpis ? Array(6).fill(0).map((_,i)=><Sk key={i} h={100}/>) : (()=>{
                 const apr=kpis.aprobadas_exitoso+kpis.aprobadas_novedades
-                return ([
+                const cards:{l:string;v:any;border:string;sub?:string}[] = [
                   {l:'Total del mes',        v:kpis.total_resolucion,    border:'#38bdf8',
                     sub:`${apr} aprobadas · ${kpis.rechazadas} rechazadas`},
                   {l:'Aprobadas sin novedad',v:kpis.aprobadas_exitoso,   border:'#4ade80',
                     sub:apr>0?`${((kpis.aprobadas_exitoso/apr)*100).toFixed(0)}% de aprobadas`:undefined},
                   {l:'Aprobadas con novedad',v:kpis.aprobadas_novedades, border:'#fbbf24',
                     sub:apr>0?`${((kpis.aprobadas_novedades/apr)*100).toFixed(0)}% de aprobadas`:undefined},
-                  {l:'Rechazadas',           v:kpis.rechazadas,          border:kpis.rechazadas>0?'#f87171':'#475569'},
-                  {l:'Ventas caídas',         v:kpis.ventas_caidas,       border:kpis.ventas_caidas>0?'#e11d48':'#475569'},
-                  {l:'Ventana de cierre',     v:`${kpis.pct_ventana_cierre}%`, border:kpis.pct_ventana_cierre>40?'#fbbf24':LIME,
+                  {l:'Rechazadas',           v:kpis.rechazadas,          border:kpis.rechazadas>0?'#f87171':'#475569',sub:undefined},
+                  {l:'Ventas caídas',        v:kpis.ventas_caidas,       border:kpis.ventas_caidas>0?'#e11d48':'#475569',sub:undefined},
+                  {l:'Ventana de cierre',    v:`${kpis.pct_ventana_cierre}%`, border:kpis.pct_ventana_cierre>40?'#fbbf24':LIME,
                     sub:`${kpis.en_ventana_cierre} en días límite`},
-                ] as const).map(k=>(
+                ]
+                return cards.map(k=>(
                   <div key={k.l} className="kpi"
                     style={{borderLeftColor:k.border}}>
                     <p className="kpi-label">{k.l}</p>
