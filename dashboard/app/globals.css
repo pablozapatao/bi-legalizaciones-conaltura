@@ -2,221 +2,146 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ══════════════════════════════════════════════════════════════════════
-   CONALTURA BI — Design System
-   Fuente: Google Stitch + paleta de marca
-   Tipografía: system-ui (garantizado en todos los entornos)
-══════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════
+   CONALTURA BI — Dark Tech Design System (Stitch-inspired)
+   Paleta: #0B1120 sidebar · #050b14→#0a192f bg · lima #A1D81A accent
+═══════════════════════════════════════════════════════════════════ */
 :root {
-  --font: system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-
-  /* Paleta Conaltura */
-  --primary:   #125160;   /* teal — sidebar, headers, texto */
-  --primary-dk:#003945;   /* teal muy oscuro — hover */
-  --beige:     #F4F0E5;   /* crema — fondo app */
-  --beige-dk:  #EDE9DC;   /* crema oscuro — cards secundarias */
-  --accent:    #A1D81A;   /* lima — live, CTAs */
-  --accent-lt: #b9f23a;   /* lima claro — hover */
-  --coral:     #FF795A;   /* coral — rechazadas */
-  --green:     #166534;   /* verde — aprobadas */
-  --amber:     #92400E;   /* ámbar — novedades */
-  --red:       #991B1B;   /* rojo — caídas */
-
-  /* Tipografía — escalas de Stitch */
-  --text-label-sm:  11px;
-  --text-label-md:  12px;
-  --text-body-md:   14px;
-  --text-body-lg:   16px;
-  --text-kpi:       44px;
-  --text-headline:  24px;
+  --f: Inter, system-ui, -apple-system, sans-serif;
+  --lime:   #A1D81A;
+  --lime-lt:#b9f23a;
+  --teal:   #125160;
+  --coral:  #FF795A;
+  --green:  #166534;
+  --amber:  #C2410C;
+  --red:    #E11D48;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { height: 100%; }
+html, body { height: 100%; }
 body {
-  height: 100%;
-  font-family: var(--font);
-  font-size: var(--text-body-md);
+  font-family: var(--f);
+  font-size: 14px;
   line-height: 20px;
-  background: var(--beige);
-  color: var(--primary);
+  background: linear-gradient(135deg, #050b14 0%, #0a192f 100%);
+  color: #e2e8f0;
   -webkit-font-smoothing: antialiased;
+  overflow: hidden;
 }
 
-/* ── KPI Card — estilo Stitch ────────────────────────────────────── */
-.kpi-card {
-  background: #ffffff;
-  border-radius: 14px;
-  border: 1px solid rgba(18,81,96,0.08);
-  border-left-width: 3px;
-  padding: 16px 18px;
-  transition: box-shadow .18s, transform .18s;
+/* ── Glass card ──────────────────────────────────────────────────── */
+.glass {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(161,216,26,0.1);
+  border-radius: 12px;
 }
-.kpi-card:hover {
-  box-shadow: 0 4px 16px rgba(18,81,96,.1);
-  transform: translateY(-1px);
+.glass-bright {
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(161,216,26,0.15);
+  border-radius: 12px;
 }
-.kpi-card .kpi-label {
-  font-size: var(--text-label-md);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(18,81,96,.5);
-  line-height: 16px;
-  margin-bottom: 10px;
-}
-.kpi-card .kpi-value {
-  font-size: var(--text-kpi);
-  font-weight: 700;
-  color: var(--primary);          /* siempre teal — el borde dice el estado */
-  line-height: 1;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
-  font-family: var(--font);
-}
-.kpi-card .kpi-sub {
-  font-size: var(--text-label-sm);
-  color: rgba(18,81,96,.45);
-  margin-top: 7px;
-  line-height: 1.45;
-}
-/* Variantes de borde — semáforo */
-.kpi-teal   { border-left-color: var(--primary); }
-.kpi-green  { border-left-color: var(--green);   }
-.kpi-amber  { border-left-color: var(--amber);   }
-.kpi-coral  { border-left-color: var(--coral);   }
-.kpi-red    { border-left-color: var(--red);      }
-
-/* ── Card blanca genérica ────────────────────────────────────────── */
-.card {
-  background: #ffffff;
-  border-radius: 14px;
-  border: 1px solid rgba(18,81,96,0.08);
-  box-shadow: 0 1px 2px rgba(18,81,96,.05);
+.glow-border {
+  border: 1px solid rgba(161,216,26,0.25);
+  box-shadow: inset 0 0 12px rgba(161,216,26,0.04), 0 0 18px rgba(161,216,26,0.08);
 }
 
-/* ── Card beige ──────────────────────────────────────────────────── */
-.card-bg {
-  background: var(--beige-dk);
-  border-radius: 14px;
-  border: 1px solid rgba(18,81,96,0.07);
+/* ── KPI card ────────────────────────────────────────────────────── */
+.kpi {
+  background: rgba(15,23,42,0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(226,232,240,0.06);
+  border-radius: 12px;
+  border-left-width: 2px;
+  padding: 14px 16px;
+  transition: border-left-color .2s, box-shadow .2s;
 }
+.kpi:hover { box-shadow: 0 0 16px rgba(161,216,26,0.08); }
+.kpi-label {
+  font-size: 11px; font-weight: 600; letter-spacing: .05em;
+  text-transform: uppercase; color: rgba(148,163,184,.75);
+  margin-bottom: 6px;
+}
+.kpi-value {
+  font-size: 40px; font-weight: 700; color: #f1f5f9;
+  line-height: 1; letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums; font-family: var(--f);
+}
+.kpi-sub { font-size: 11px; color: rgba(148,163,184,.55); margin-top: 5px; }
 
-/* ── BI Table — exacto al código de Stitch ───────────────────────── */
-.bi-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--text-label-md);
-  font-family: var(--font);
-}
-.bi-table thead {
-  background: var(--primary);
-  position: sticky;
-  top: 0;
-  z-index: 2;
-}
+/* ── Table ───────────────────────────────────────────────────────── */
+.bi-table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: var(--f); }
+.bi-table thead { background: #0B1120; position: sticky; top: 0; z-index: 2; }
 .bi-table thead tr:first-child th {
-  padding: 5px 10px 4px;
-  font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .1em;
-  color: rgba(255,255,255,.5);
-  border-bottom: 1px solid rgba(255,255,255,.07);
+  padding: 5px 10px 4px; font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .1em;
+  color: rgba(161,216,26,.45); border-bottom: 1px solid rgba(161,216,26,.08);
 }
-.bi-table thead tr:last-child th,
-.bi-table thead tr:only-child th {
-  padding: 7px 10px;
-  font-size: var(--text-label-sm);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .07em;
-  color: rgba(255,255,255,.85);
-  white-space: nowrap;
-  cursor: pointer;
-  user-select: none;
-  border-bottom: 2px solid rgba(255,255,255,.08);
+.bi-table thead tr:last-child th, .bi-table thead tr:only-child th {
+  padding: 7px 10px; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: rgba(148,163,184,.8); white-space: nowrap;
+  cursor: pointer; user-select: none;
+  border-bottom: 1px solid rgba(161,216,26,.1);
 }
-.bi-table thead th:hover  { color: var(--accent); }
-.bi-table thead th.sorted { color: var(--accent); }
+.bi-table thead th:hover  { color: var(--lime); }
+.bi-table thead th.sorted { color: var(--lime); }
+.bi-table tbody tr { border-bottom: 1px solid rgba(226,232,240,.04); transition: background .1s; }
+.bi-table tbody tr:nth-child(even) { background: rgba(15,23,42,.3); }
+.bi-table tbody tr:nth-child(odd)  { background: transparent; }
+.bi-table tbody tr:hover { background: rgba(161,216,26,.04) !important; }
+.bi-table td { padding: 8px 10px; vertical-align: middle; color: #cbd5e1; }
+.bi-table tfoot tr { background: #0B1120 !important; border-top: 1px solid rgba(161,216,26,.15); }
+.bi-table tfoot td { padding: 9px 10px; font-size: 11px; font-weight: 700; color: rgba(241,245,249,.7); }
 
-.bi-table tbody tr {
-  border-bottom: 1px solid rgba(18,81,96,.06);
-  transition: background .1s;
-}
-.bi-table tbody tr:nth-child(even) { background: rgba(244,240,229,.5); }
-.bi-table tbody tr:nth-child(odd)  { background: #ffffff; }
-.bi-table tbody tr:hover           { background: rgba(18,81,96,.035) !important; }
-.bi-table td {
-  padding: 8px 10px;
-  vertical-align: middle;
-  color: var(--primary);
-  font-size: var(--text-body-md);
-}
-.bi-table tfoot tr   { background: var(--primary) !important; }
-.bi-table tfoot td   {
-  padding: 9px 10px;
-  font-size: var(--text-label-md);
-  font-weight: 700;
-  color: rgba(255,255,255,.75);
-}
-
-/* ── Section accent bar (igual que Stitch) ───────────────────────── */
+/* ── Sec bar ─────────────────────────────────────────────────────── */
 .sec-bar {
-  width: 4px; height: 22px; border-radius: 99px; flex-shrink: 0;
-  background: linear-gradient(180deg, var(--accent), var(--primary));
+  width: 3px; height: 20px; border-radius: 99px; flex-shrink: 0;
+  background: var(--lime);
+  box-shadow: 0 0 8px rgba(161,216,26,.6);
 }
 
-/* ── Sidebar input ───────────────────────────────────────────────── */
+/* ── Input ───────────────────────────────────────────────────────── */
 .inp {
-  width: 100%;
-  padding: 7px 11px;
-  border-radius: 9px;
-  border: 1px solid rgba(255,255,255,.18);
-  background: rgba(255,255,255,.1);
-  color: rgba(255,255,255,.9);
-  font-size: var(--text-body-md);
-  font-family: var(--font);
-  outline: none;
+  width: 100%; padding: 7px 11px; border-radius: 8px;
+  border: 1px solid rgba(161,216,26,.2);
+  background: rgba(15,23,42,.6); color: rgba(226,232,240,.9);
+  font-size: 12px; outline: none; font-family: var(--f);
 }
-.inp:focus { border-color: var(--accent); }
+.inp:focus { border-color: rgba(161,216,26,.5); }
+.inp option { background: #0B1120; }
 
 /* ── Badge ───────────────────────────────────────────────────────── */
 .badge {
-  display: inline-flex; align-items: center;
-  padding: 2px 8px; border-radius: 99px;
-  font-size: var(--text-label-sm); font-weight: 600;
-  white-space: nowrap;
+  display: inline-flex; align-items: center; padding: 2px 8px;
+  border-radius: 99px; font-size: 10px; font-weight: 600; white-space: nowrap;
 }
 
-/* ── Live dot ─────────────────────────────────────────────────────── */
-@keyframes pulse-ring {
-  0%   { box-shadow: 0 0 0 0 rgba(161,216,26,.5); }
-  70%  { box-shadow: 0 0 0 5px rgba(161,216,26,0); }
-  100% { box-shadow: 0 0 0 0 rgba(161,216,26,0); }
+/* ── Live dot ────────────────────────────────────────────────────── */
+@keyframes pulse-glow {
+  0%,100% { box-shadow: 0 0 4px rgba(161,216,26,.6); opacity: 1; }
+  50%      { box-shadow: 0 0 10px rgba(161,216,26,.9); opacity: .8; }
 }
-.live-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--accent);
-  animation: pulse-ring 2s ease infinite;
-}
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); animation: pulse-glow 2s ease infinite; }
 
-/* ── Shimmer skeleton ────────────────────────────────────────────── */
-@keyframes shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position:  200% 0; }
-}
+/* ── Shimmer ─────────────────────────────────────────────────────── */
+@keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
 .shimmer {
-  background: linear-gradient(90deg,
-    rgba(18,81,96,.04) 25%, rgba(18,81,96,.09) 50%, rgba(18,81,96,.04) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s ease infinite;
-  border-radius: 8px;
+  background: linear-gradient(90deg,rgba(15,23,42,.4) 25%,rgba(161,216,26,.06) 50%,rgba(15,23,42,.4) 75%);
+  background-size: 200% 100%; animation: shimmer 1.6s ease infinite; border-radius: 8px;
 }
 
-/* ── Spin ────────────────────────────────────────────────────────── */
-@keyframes spin { to { transform: rotate(360deg); } }
+/* ── Motivo semáforo ─────────────────────────────────────────────── */
+.sem-verde   { color: #4ade80; }
+.sem-amarillo{ color: #fbbf24; }
+.sem-rojo    { color: #f87171; }
 
 /* ── Scrollbar ───────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-thumb { background: rgba(18,81,96,.2); border-radius: 99px; }
+::-webkit-scrollbar-track { background: rgba(15,23,42,.5); }
+::-webkit-scrollbar-thumb { background: rgba(161,216,26,.25); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(161,216,26,.45); }
+
+/* ── Spin ────────────────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
