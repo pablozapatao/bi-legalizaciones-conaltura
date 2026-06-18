@@ -2,49 +2,115 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ══════════════════════════════════════════════════════════════════════
+   CONALTURA BI — Design System
+   Fuente: Google Stitch + paleta de marca
+   Tipografía: system-ui (garantizado en todos los entornos)
+══════════════════════════════════════════════════════════════════════ */
 :root {
-  --primary:   #125160;
-  --primary-dk:#0a3340;
-  --beige:     #F4F0E5;
-  --beige-dk:  #EDE9DC;
-  --accent:    #A1D81A;
-  --accent-lt: #DBFF69;
-  --coral:     #FF795A;
-  --success:   #166534;
-  --warning:   #92400E;
-  --red:       #991B1B;
+  --font: system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+
+  /* Paleta Conaltura */
+  --primary:   #125160;   /* teal — sidebar, headers, texto */
+  --primary-dk:#003945;   /* teal muy oscuro — hover */
+  --beige:     #F4F0E5;   /* crema — fondo app */
+  --beige-dk:  #EDE9DC;   /* crema oscuro — cards secundarias */
+  --accent:    #A1D81A;   /* lima — live, CTAs */
+  --accent-lt: #b9f23a;   /* lima claro — hover */
+  --coral:     #FF795A;   /* coral — rechazadas */
+  --green:     #166534;   /* verde — aprobadas */
+  --amber:     #92400E;   /* ámbar — novedades */
+  --red:       #991B1B;   /* rojo — caídas */
+
+  /* Tipografía — escalas de Stitch */
+  --text-label-sm:  11px;
+  --text-label-md:  12px;
+  --text-body-md:   14px;
+  --text-body-lg:   16px;
+  --text-kpi:       44px;
+  --text-headline:  24px;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-/* Layout: the outer div uses height:100vh + overflow:hidden — not body */
 html { height: 100%; }
 body {
   height: 100%;
-  font-family: 'Inter', var(--font-inter), -apple-system, sans-serif;
+  font-family: var(--font);
+  font-size: var(--text-body-md);
+  line-height: 20px;
   background: var(--beige);
   color: var(--primary);
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── Glass card ─────────────────────────────────────────────────────── */
-.card {
-  background: white;
+/* ── KPI Card — estilo Stitch ────────────────────────────────────── */
+.kpi-card {
+  background: #ffffff;
   border-radius: 14px;
-  border: 1px solid rgba(18,81,96,0.09);
-  box-shadow: 0 1px 3px rgba(18,81,96,0.07);
+  border: 1px solid rgba(18,81,96,0.08);
+  border-left-width: 3px;
+  padding: 16px 18px;
+  transition: box-shadow .18s, transform .18s;
+}
+.kpi-card:hover {
+  box-shadow: 0 4px 16px rgba(18,81,96,.1);
+  transform: translateY(-1px);
+}
+.kpi-card .kpi-label {
+  font-size: var(--text-label-md);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(18,81,96,.5);
+  line-height: 16px;
+  margin-bottom: 10px;
+}
+.kpi-card .kpi-value {
+  font-size: var(--text-kpi);
+  font-weight: 700;
+  color: var(--primary);          /* siempre teal — el borde dice el estado */
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font);
+}
+.kpi-card .kpi-sub {
+  font-size: var(--text-label-sm);
+  color: rgba(18,81,96,.45);
+  margin-top: 7px;
+  line-height: 1.45;
+}
+/* Variantes de borde — semáforo */
+.kpi-teal   { border-left-color: var(--primary); }
+.kpi-green  { border-left-color: var(--green);   }
+.kpi-amber  { border-left-color: var(--amber);   }
+.kpi-coral  { border-left-color: var(--coral);   }
+.kpi-red    { border-left-color: var(--red);      }
+
+/* ── Card blanca genérica ────────────────────────────────────────── */
+.card {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid rgba(18,81,96,0.08);
+  box-shadow: 0 1px 2px rgba(18,81,96,.05);
 }
 
-/* ── BI table ─────────────────────────────────────────────────────── */
+/* ── Card beige ──────────────────────────────────────────────────── */
+.card-bg {
+  background: var(--beige-dk);
+  border-radius: 14px;
+  border: 1px solid rgba(18,81,96,0.07);
+}
+
+/* ── BI Table — exacto al código de Stitch ───────────────────────── */
 .bi-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
-  font-family: 'Inter', var(--font-inter), -apple-system, sans-serif;
+  font-size: var(--text-label-md);
+  font-family: var(--font);
 }
 .bi-table thead {
-  background: #125160;
+  background: var(--primary);
   position: sticky;
   top: 0;
   z-index: 2;
@@ -55,106 +121,102 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .1em;
-  color: rgba(244,240,229,.5);
-  border-bottom: 1px solid rgba(255,255,255,.06);
+  color: rgba(255,255,255,.5);
+  border-bottom: 1px solid rgba(255,255,255,.07);
 }
 .bi-table thead tr:last-child th,
 .bi-table thead tr:only-child th {
   padding: 7px 10px;
-  font-size: 10px;
+  font-size: var(--text-label-sm);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .07em;
-  color: rgba(244,240,229,.8);
+  color: rgba(255,255,255,.85);
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
   border-bottom: 2px solid rgba(255,255,255,.08);
 }
-.bi-table thead th:hover  { color: #A1D81A; }
-.bi-table thead th.sorted { color: #A1D81A; }
+.bi-table thead th:hover  { color: var(--accent); }
+.bi-table thead th.sorted { color: var(--accent); }
 
 .bi-table tbody tr {
-  border-bottom: 1px solid rgba(18,81,96,.055);
-  transition: background .12s;
+  border-bottom: 1px solid rgba(18,81,96,.06);
+  transition: background .1s;
 }
-.bi-table tbody tr:hover         { background: rgba(18,81,96,.04) !important; }
-.bi-table tbody tr:nth-child(even){ background: rgba(244,240,229,.5); }
-.bi-table tbody tr:nth-child(odd) { background: white; }
+.bi-table tbody tr:nth-child(even) { background: rgba(244,240,229,.5); }
+.bi-table tbody tr:nth-child(odd)  { background: #ffffff; }
+.bi-table tbody tr:hover           { background: rgba(18,81,96,.035) !important; }
 .bi-table td {
   padding: 8px 10px;
   vertical-align: middle;
   color: var(--primary);
+  font-size: var(--text-body-md);
 }
-
-.bi-table tfoot tr {
-  background: #125160 !important;
-  border-top: 2px solid rgba(255,255,255,.1);
-}
-.bi-table tfoot td {
+.bi-table tfoot tr   { background: var(--primary) !important; }
+.bi-table tfoot td   {
   padding: 9px 10px;
-  font-size: 11px;
+  font-size: var(--text-label-md);
   font-weight: 700;
-  color: rgba(244,240,229,.7);
+  color: rgba(255,255,255,.75);
 }
 
-/* ── Shimmer ─────────────────────────────────────────────────────── */
+/* ── Section accent bar (igual que Stitch) ───────────────────────── */
+.sec-bar {
+  width: 4px; height: 22px; border-radius: 99px; flex-shrink: 0;
+  background: linear-gradient(180deg, var(--accent), var(--primary));
+}
+
+/* ── Sidebar input ───────────────────────────────────────────────── */
+.inp {
+  width: 100%;
+  padding: 7px 11px;
+  border-radius: 9px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.1);
+  color: rgba(255,255,255,.9);
+  font-size: var(--text-body-md);
+  font-family: var(--font);
+  outline: none;
+}
+.inp:focus { border-color: var(--accent); }
+
+/* ── Badge ───────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: 99px;
+  font-size: var(--text-label-sm); font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ── Live dot ─────────────────────────────────────────────────────── */
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(161,216,26,.5); }
+  70%  { box-shadow: 0 0 0 5px rgba(161,216,26,0); }
+  100% { box-shadow: 0 0 0 0 rgba(161,216,26,0); }
+}
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  animation: pulse-ring 2s ease infinite;
+}
+
+/* ── Shimmer skeleton ────────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
 }
 .shimmer {
   background: linear-gradient(90deg,
-    rgba(18,81,96,.05) 25%, rgba(18,81,96,.10) 50%, rgba(18,81,96,.05) 75%);
+    rgba(18,81,96,.04) 25%, rgba(18,81,96,.09) 50%, rgba(18,81,96,.04) 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.6s ease infinite;
+  animation: shimmer 1.5s ease infinite;
   border-radius: 8px;
 }
 
-/* ── Sec-bar accent ─────────────────────────────────────────────── */
-.sec-bar {
-  width: 4px;
-  height: 22px;
-  border-radius: 99px;
-  background: linear-gradient(180deg, #A1D81A, #125160);
-  flex-shrink: 0;
-}
-
-/* ── KPI hover ──────────────────────────────────────────────────── */
-.kpi-card:hover {
-  box-shadow: 0 6px 20px rgba(18,81,96,.12) !important;
-  transform: translateY(-2px);
-}
-
-/* ── Input (sidebar) ─────────────────────────────────────────────── */
-.inp {
-  width: 100%;
-  padding: 7px 11px;
-  border-radius: 9px;
-  border: 1px solid rgba(18,81,96,.2);
-  background: rgba(255,255,255,.09);
-  color: rgba(244,240,229,.9);
-  font-size: 12px;
-  outline: none;
-  font-family: inherit;
-}
-.inp:focus { border-color: #A1D81A; }
-
-/* ── Live dot ───────────────────────────────────────────────────── */
-@keyframes pulse-ring {
-  0%   { transform: scale(.9); box-shadow: 0 0 0 0 rgba(161,216,26,.5); }
-  70%  { transform: scale(1);  box-shadow: 0 0 0 6px rgba(161,216,26,0); }
-  100% { transform: scale(.9); box-shadow: 0 0 0 0 rgba(161,216,26,0); }
-}
-.live-dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: #A1D81A;
-  animation: pulse-ring 2s ease infinite;
-}
-
-/* ── Spin ───────────────────────────────────────────────────────── */
+/* ── Spin ────────────────────────────────────────────────────────── */
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Scrollbar ─────────────────────────────────────────────────── */
+/* ── Scrollbar ───────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-thumb { background: rgba(18,81,96,.22); border-radius: 99px; }
+::-webkit-scrollbar-thumb { background: rgba(18,81,96,.2); border-radius: 99px; }
