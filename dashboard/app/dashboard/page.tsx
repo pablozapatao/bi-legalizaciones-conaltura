@@ -55,7 +55,7 @@ const TT_STYLE = {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   GAUGE — semicircular manual de marca
+   GAUGE — compacto, sin solapamiento, meta separada debajo del arco
 ════════════════════════════════════════════════════════════════════ */
 function Gauge({pct:p,meta,onEdit}:{pct:number;meta:number;onEdit:()=>void}) {
   const [v,setV]=useState(0)
@@ -71,7 +71,8 @@ function Gauge({pct:p,meta,onEdit}:{pct:number;meta:number;onEdit:()=>void}) {
     return ()=>{if(raf.current)cancelAnimationFrame(raf.current)}
   },[p])
 
-  const R=60,cx=80,cy=74,startDeg=-210,sweep=240
+  // Arco más pequeño, centrado bien
+  const R=48,cx=64,cy=58,startDeg=-210,sweep=240
   const arc=(sd:number,sw:number)=>{
     const r=(d:number)=>d*Math.PI/180,[a,b]=[r(sd),r(sd+sw)]
     return `M${cx+R*Math.cos(a)} ${cy+R*Math.sin(a)} A${R} ${R} 0 ${sw>180?1:0} 1 ${cx+R*Math.cos(b)} ${cy+R*Math.sin(b)}`
@@ -81,19 +82,40 @@ function Gauge({pct:p,meta,onEdit}:{pct:number;meta:number;onEdit:()=>void}) {
   const lbl=v>=90?'En meta ✓':v>=60?'En riesgo':'Crítico'
 
   return (
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8}}>
-      <svg width="160" height="96" viewBox="0 0 160 96" style={{overflow:'visible'}}>
-        <path d={arc(startDeg,sweep)} fill="none" stroke="rgba(18,81,96,.09)" strokeWidth="10" strokeLinecap="round"/>
-        {fill>0&&<path d={arc(startDeg,fill)} fill="none" stroke={col} strokeWidth="10" strokeLinecap="round"/>}
-        <text x={cx} y={cy+1} textAnchor="middle" fontSize="26" fontWeight="900" fontFamily={F} fill={col}>{v}%</text>
-        <text x={cx} y={cy+17} textAnchor="middle" fontSize="10" fontWeight="600" fontFamily={F} fill={col} opacity=".85">{lbl}</text>
-        {meta>0&&<text x={cx} y={cy+31} textAnchor="middle" fontSize="9.5" fontFamily={F} fill="rgba(18,81,96,.45)">meta {fN(meta)}</text>}
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:0,width:'100%'}}>
+      {/* Arco SVG — solo el arco y el número grande */}
+      <svg width="128" height="78" viewBox="0 0 128 78" style={{overflow:'visible'}}>
+        <path d={arc(startDeg,sweep)} fill="none" stroke="rgba(18,81,96,.08)" strokeWidth="9" strokeLinecap="round"/>
+        {fill>0&&<path d={arc(startDeg,fill)} fill="none" stroke={col} strokeWidth="9" strokeLinecap="round"/>}
+        {/* Número grande — bien centrado en el arco */}
+        <text x={cx} y={cy+2} textAnchor="middle" fontSize="22" fontWeight="900" fontFamily={F} fill={col}>{v}%</text>
+        <text x={cx} y={cy+15} textAnchor="middle" fontSize="9" fontWeight="600" fontFamily={F} fill={col} opacity=".75">{lbl}</text>
       </svg>
-      <button onClick={onEdit} style={{
-        fontSize:10,fontWeight:600,padding:'4px 14px',borderRadius:8,fontFamily:F,
-        border:`1px solid rgba(18,81,96,.18)`,background:'transparent',
-        color:'rgba(18,81,96,.55)',cursor:'pointer',letterSpacing:'.02em',
-      }}>{meta>0?'Editar meta':'+ Fijar meta'}</button>
+
+      {/* Meta — separada visualmente del arco, fuera del SVG */}
+      {meta>0 ? (
+        <div style={{
+          display:'flex',alignItems:'center',gap:6,
+          padding:'4px 10px',borderRadius:99,
+          background:'rgba(18,81,96,.06)',
+          border:'1px solid rgba(18,81,96,.1)',
+          marginTop:4,
+        }}>
+          <span style={{fontSize:9,color:'rgba(18,81,96,.45)',textTransform:'uppercase',letterSpacing:'.07em'}}>meta</span>
+          <span style={{fontSize:12,fontWeight:900,color:T}}>{fN(meta)}</span>
+          <button onClick={onEdit} style={{
+            fontSize:9,padding:'1px 7px',borderRadius:99,fontFamily:F,
+            border:`1px solid rgba(18,81,96,.18)`,background:'transparent',
+            color:'rgba(18,81,96,.45)',cursor:'pointer',marginLeft:2,
+          }}>editar</button>
+        </div>
+      ) : (
+        <button onClick={onEdit} style={{
+          fontSize:10,fontWeight:600,padding:'4px 12px',borderRadius:99,fontFamily:F,
+          border:`1px solid rgba(18,81,96,.18)`,background:'transparent',
+          color:'rgba(18,81,96,.5)',cursor:'pointer',marginTop:4,
+        }}>+ Fijar meta</button>
+      )}
     </div>
   )
 }
@@ -344,6 +366,7 @@ export default function Dashboard() {
   const [proy,    setPr]=useState<any>(null)
   const [cana,    setCa]=useState<any>(null)
   const [det,     setDe]=useState<any>(null)
+  const [motivos, setMo]=useState<any[]>([])  // NEW: motivos por director
   const [ldDet,   setLd]=useState(false)
   const [loading, setLoading]=useState(true)
   const [allProy, setAllProy]=useState<string[]>([])
@@ -372,6 +395,25 @@ export default function Dashboard() {
       setK(k);setP(p);setT(t);setTi(ti);setPr(pr);setCa(ca)
       // Extraer lista de proyectos para el filtro
       if(pr?.proyectos) setAllProy(pr.proyectos.map((x:any)=>x.proyecto).filter(Boolean).sort())
+      // Cargar motivos de observación desde detalle (todos, sin paginación limitada)
+      try {
+        const detAll = await fetch(`/api/detalle?${q}&pagina=1&por_pagina=200`).then(r=>r.json())
+        // Agregar por director + motivo
+        const map: Record<string,Record<string,number>> = {}
+        for (const row of (detAll.rows||[])) {
+          if (!row.motivo_de_observacion || row.motivo_de_observacion.trim()==='') continue
+          const dir = (row.director||'Sin director').split(' ')[0]+' '+((row.director||'').split(' ').slice(-1)[0]||'')
+          const mot = row.motivo_de_observacion.trim().substring(0,60)
+          if (!map[mot]) map[mot]={}
+          map[mot][dir]=(map[mot][dir]||0)+1
+        }
+        // Convertir a array para el gráfico, top 8 motivos
+        const arr = Object.entries(map)
+          .map(([motivo,dirs])=>({motivo, total:Object.values(dirs).reduce((s,n)=>s+n,0), dirs}))
+          .sort((a,b)=>b.total-a.total)
+          .slice(0,8)
+        setMo(arr)
+      } catch { setMo([]) }
     }finally{setLoading(false)}
   },[qs])
 
@@ -689,38 +731,53 @@ export default function Dashboard() {
                   prog:kpis.pct_ventana_cierre},
               ]
               return (
-                <div style={{display:'grid',gridTemplateColumns:'190px 1fr',gap:14}}>
+                <div style={{display:'grid',gridTemplateColumns:'170px 1fr',gap:12}}>
                   {/* Gauge */}
-                  <div className="card" style={{padding:'18px 14px',display:'flex',
-                    flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
+                  <div className="card" style={{padding:'14px 12px',display:'flex',
+                    flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4}}>
                     <p style={{fontSize:9,fontWeight:700,textTransform:'uppercase',letterSpacing:'.09em',
-                      color:'rgba(18,81,96,.38)',textAlign:'center',marginBottom:8}}>
-                      CUMPLIMIENTO VS META
+                      color:'rgba(18,81,96,.38)',textAlign:'center',marginBottom:2}}>
+                      CUMPLIMIENTO
                     </p>
                     <Gauge pct={kpis.pct_cumplimiento} meta={kpis.meta_negocios} onEdit={()=>setMeta(true)}/>
                   </div>
 
-                  {/* 6 KPI cards */}
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:9}}>
+                  {/* 6 KPI cards — 3 columnas × 2 filas, más compactas */}
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
                     {cards.map(k=>(
-                      <div key={k.l} className="kpi-card" style={{borderLeftColor:k.border}}>
-                        <p className="kpi-label" style={{display:'flex',alignItems:'center',gap:4}}>
+                      <div key={k.l} style={{
+                        background:'white',borderRadius:11,
+                        border:'1px solid rgba(18,81,96,.07)',
+                        borderLeft:`3px solid ${k.border}`,
+                        padding:'11px 14px',
+                        transition:'box-shadow .18s',
+                      }}>
+                        <p style={{fontSize:9,fontWeight:700,textTransform:'uppercase',
+                          letterSpacing:'.07em',color:'rgba(18,81,96,.45)',
+                          marginBottom:5,display:'flex',alignItems:'center',gap:3}}>
                           {k.l}
-                          {k.tip&&(
-                            <span className="tip" data-tip={k.tip}
-                              style={{cursor:'help',color:'rgba(18,81,96,.35)',fontSize:12,lineHeight:1}}>?</span>
-                          )}
+                          {k.tip&&<span className="tip" data-tip={k.tip}
+                            style={{cursor:'help',color:'rgba(18,81,96,.3)',fontSize:11,lineHeight:1}}>?</span>}
                         </p>
-                        <p className="kpi-value">{typeof k.v==='number'?fN(k.v):k.v}</p>
+                        {/* Número más pequeño y elegante */}
+                        <p style={{
+                          fontFamily:F,fontSize:26,fontWeight:900,color:T,
+                          margin:0,lineHeight:1,letterSpacing:'-.03em',
+                          fontVariantNumeric:'tabular-nums',
+                        }}>
+                          {typeof k.v==='number'?fN(k.v):k.v}
+                        </p>
                         {k.prog!=null&&(
-                          <div className="progress-track" style={{marginTop:6,marginBottom:4}}>
-                            <div className="progress-fill" style={{
-                              width:`${Math.min(k.prog,100)}%`,
+                          <div style={{height:3,background:'rgba(18,81,96,.08)',
+                            borderRadius:99,overflow:'hidden',marginTop:5}}>
+                            <div style={{height:'100%',borderRadius:99,
                               background:k.border,
-                            }}/>
+                              width:`${Math.min(k.prog,100)}%`,
+                              transition:'width .8s cubic-bezier(.4,0,.2,1)'}}/>
                           </div>
                         )}
-                        {k.sub&&<p className="kpi-sub">{k.sub}</p>}
+                        {k.sub&&<p style={{fontSize:10,color:'rgba(18,81,96,.45)',
+                          marginTop:4,lineHeight:1.4}}>{k.sub}</p>}
                       </div>
                     ))}
                   </div>
@@ -1176,7 +1233,128 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {/* ══ 5. TRAZABILIDAD ENLAZADA AL PIPELINE ══════════════════ */}
+          {/* ══ 5. MOTIVOS DE OBSERVACIÓN ════════════════════════════ */}
+          <section>
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+              <div className="sec-bar"/>
+              <div>
+                <h2 style={{fontSize:13,fontWeight:900,color:T,margin:0,textTransform:'uppercase',letterSpacing:'.04em'}}>
+                  MOTIVOS DE OBSERVACIÓN
+                </h2>
+                <p style={{fontSize:10,color:'rgba(18,81,96,.5)',marginTop:1}}>
+                  ¿Por qué se generan observaciones en las legalizaciones? · frecuencia por motivo
+                </p>
+              </div>
+            </div>
+
+            <div style={{display:'grid',gridTemplateColumns:'1fr 340px',gap:14}}>
+              {/* Gráfico de barras horizontales */}
+              <div className="card" style={{padding:18}}>
+                {motivos.length===0 ? (
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'center',
+                    height:180,color:'rgba(18,81,96,.35)',fontSize:13}}>
+                    Sin observaciones en el período seleccionado
+                  </div>
+                ) : (
+                  <>
+                    <p style={{fontSize:9,fontWeight:700,textTransform:'uppercase',
+                      letterSpacing:'.08em',color:'rgba(18,81,96,.4)',marginBottom:14}}>
+                      TOP MOTIVOS — FRECUENCIA ACUMULADA
+                    </p>
+                    <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                      {motivos.map((m,i)=>{
+                        const maxT=motivos[0]?.total||1
+                        const pctW=Math.max((m.total/maxT)*100,4)
+                        const col=[T,'#1a6b7a','#1a7d6e',AM,'#4d7c0f',OR,PU,'#92400E'][i%8]
+                        return (
+                          <div key={m.motivo}>
+                            <div style={{display:'flex',justifyContent:'space-between',
+                              alignItems:'flex-end',marginBottom:4}}>
+                              <span style={{fontSize:11,fontWeight:600,color:T,
+                                maxWidth:420,lineHeight:1.3,flex:1,paddingRight:8}}>
+                                {m.motivo}
+                              </span>
+                              <span style={{fontSize:13,fontWeight:900,color:col,
+                                flexShrink:0,marginLeft:8}}>
+                                {m.total}
+                              </span>
+                            </div>
+                            <div style={{height:6,borderRadius:99,
+                              background:'rgba(18,81,96,.07)',overflow:'hidden'}}>
+                              <div style={{
+                                width:`${pctW}%`,height:'100%',borderRadius:99,
+                                background:col,opacity:.85,
+                                transition:'width .7s cubic-bezier(.4,0,.2,1)',
+                              }}/>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Tabla por director */}
+              <div className="card" style={{padding:18}}>
+                <p style={{fontSize:9,fontWeight:700,textTransform:'uppercase',
+                  letterSpacing:'.08em',color:'rgba(18,81,96,.4)',marginBottom:14}}>
+                  POR DIRECTOR
+                </p>
+                {motivos.length===0 ? (
+                  <p style={{fontSize:12,color:'rgba(18,81,96,.35)',textAlign:'center',paddingTop:16}}>
+                    Sin datos
+                  </p>
+                ) : (()=>{
+                  // Agrupar por director → total de observaciones
+                  const dirMap: Record<string,number> = {}
+                  motivos.forEach(m=>{
+                    Object.entries(m.dirs).forEach(([dir,cnt])=>{
+                      dirMap[dir]=(dirMap[dir]||0)+(cnt as number)
+                    })
+                  })
+                  const dirs = Object.entries(dirMap).sort((a,b)=>b[1]-a[1])
+                  const maxD = dirs[0]?.[1]||1
+                  return (
+                    <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                      {dirs.map(([dir,cnt],i)=>{
+                        const col=[T,'#1a6b7a','#1a7d6e',AM,OR,PU][i%6]
+                        const pctW=Math.max((cnt/maxD)*100,6)
+                        return (
+                          <div key={dir}>
+                            <div style={{display:'flex',justifyContent:'space-between',
+                              marginBottom:4,alignItems:'center'}}>
+                              <span style={{fontSize:11,fontWeight:600,color:T}}>
+                                {dir}
+                              </span>
+                              <span style={{fontSize:13,fontWeight:900,color:col}}>
+                                {cnt}
+                              </span>
+                            </div>
+                            <div style={{height:5,borderRadius:99,
+                              background:'rgba(18,81,96,.07)',overflow:'hidden'}}>
+                              <div style={{
+                                width:`${pctW}%`,height:'100%',borderRadius:99,
+                                background:col,opacity:.8,
+                                transition:'width .7s',
+                              }}/>
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {/* Nota */}
+                      <p style={{fontSize:10,color:'rgba(18,81,96,.35)',marginTop:6,
+                        paddingTop:8,borderTop:'1px solid rgba(18,81,96,.07)',lineHeight:1.5}}>
+                        Suma total de registros con motivo de observación activo en el período.
+                      </p>
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
+          </section>
+
+          {/* ══ 6. TRAZABILIDAD ENLAZADA AL PIPELINE ══════════════════ */}
           <section>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
               <div style={{display:'flex',alignItems:'center',gap:10}}>
