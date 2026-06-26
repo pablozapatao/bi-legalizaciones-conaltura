@@ -396,28 +396,25 @@ def calcular_ventana_cierre(
     fecha_aprobacion_final: Optional[date],
 ) -> bool:
     """
-    Plan A: usa date_entered del stage de aprobación como ancla.
-    Plan B: fallback a fecha_aprobacion_final si date_entered vacío.
-    Solo aplica a aprobado_exitoso y aprobado_novedades.
-    Ventana: últimos 3 días calendario del mes + primeros 4 del siguiente.
+    Ventana de cierre — DEFINICIÓN CORREGIDA:
+    Una aprobación está en ventana si fecha_aprobacion_final cae en el día 25
+    o posterior del mes correspondiente.
+
+    Ancla: fecha_aprobacion_final (fecha madre del registro).
+    - Solo aplica a aprobado_exitoso y aprobado_novedades.
+    - Criterio: ancla.day >= 25
     """
     if etapa_codigo not in ("aprobado_exitoso", "aprobado_novedades"):
         return False
 
-    if etapa_codigo == "aprobado_exitoso" and date_entered_exitoso:
-        ancla: date = date_entered_exitoso.date()
-    elif etapa_codigo == "aprobado_novedades" and date_entered_novedades:
-        ancla = date_entered_novedades.date()
-    elif fecha_aprobacion_final:
-        ancla = fecha_aprobacion_final
-    else:
+    # Siempre usamos fecha_aprobacion_final como ancla para consistencia
+    # con la query de la API (/api/kpis) que hace EXTRACT(DAY ...) >= 25
+    ancla: Optional[date] = fecha_aprobacion_final
+    if ancla is None:
         return False
 
-    anio, mes = ancla.year, ancla.month
     try:
-        primer_dia_sig = date(anio+1,1,1) if mes==12 else date(anio,mes+1,1)
-        ultimo_dia     = primer_dia_sig - timedelta(days=1)
-        return (ultimo_dia - timedelta(days=2)) <= ancla <= (primer_dia_sig + timedelta(days=3))
+        return ancla.day >= 25
     except Exception:
         return False
 
