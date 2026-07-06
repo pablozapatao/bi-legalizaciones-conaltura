@@ -72,11 +72,12 @@ STAGE_MAP = {
     "1345851003": {"codigo": "aprobado_novedades",  "grupo": "resolucion", "label": "Aprobado con Novedades"},
     "1315574200": {"codigo": "negocio_rechazado",   "grupo": "resolucion", "label": "Negocio Rechazado"},
     "1378706098": {"codigo": "venta_caida",         "grupo": "caida",      "label": "Negocios Fallidos - Venta Caída"},
+    "1394950689": {"codigo": "aprobado_gerencia",   "grupo": "resolucion", "label": "Aprobado por Gerencia Comercial - Con Novedades"},
 }
 
 STAGE_ORDEN = [
     "consignacion", "legal_espera", "legal_aprobada_dir", "revision_sinco",
-    "aprobado_exitoso", "aprobado_novedades", "negocio_rechazado", "venta_caida",
+    "aprobado_exitoso", "aprobado_novedades", "aprobado_gerencia", "negocio_rechazado", "venta_caida",
 ]
 
 DATE_ENTERED_FIELDS = {
@@ -88,6 +89,7 @@ DATE_ENTERED_FIELDS = {
     "1345851003": "hs_v2_date_entered_1345851003",
     "1315574200": "hs_v2_date_entered_1315574200",
     "1378706098": "hs_v2_date_entered_1378706098",
+    "1394950689": "hs_v2_date_entered_1394950689",
 }
 
 LEGAL_PROPS = [
@@ -111,6 +113,7 @@ LEGAL_PROPS = [
     "hs_v2_date_entered_1345851003",
     "hs_v2_date_entered_1315574200",
     "hs_v2_date_entered_1378706098",
+    "hs_v2_date_entered_1394950689",
 ]
 
 DEAL_PROPS = [
@@ -394,6 +397,7 @@ def calcular_ventana_cierre(
     date_entered_exitoso:   Optional[datetime],
     date_entered_novedades: Optional[datetime],
     fecha_aprobacion_final: Optional[date],
+    date_entered_gerencia:  Optional[datetime] = None,
 ) -> bool:
     """
     Ventana de cierre — DEFINICIÓN CORREGIDA:
@@ -404,7 +408,7 @@ def calcular_ventana_cierre(
     - Solo aplica a aprobado_exitoso y aprobado_novedades.
     - Criterio: ancla.day >= 25
     """
-    if etapa_codigo not in ("aprobado_exitoso", "aprobado_novedades"):
+    if etapa_codigo not in ("aprobado_exitoso", "aprobado_novedades", "aprobado_gerencia"):
         return False
 
     # Siempre usamos fecha_aprobacion_final como ancla para consistencia
@@ -440,6 +444,7 @@ def transform_legalizacion(record, legal_to_deal, deals_map, portal_id) -> Dict:
         "revision_sinco":"date_entered_revision_sinco",
         "aprobado_exitoso":"date_entered_aprobado_exitoso",
         "aprobado_novedades":"date_entered_aprobado_novedades",
+        "aprobado_gerencia":"date_entered_aprobado_gerencia",
         "negocio_rechazado":"date_entered_negocio_rechazado",
         "venta_caida":"date_entered_venta_caida",
     }
@@ -482,6 +487,7 @@ def transform_legalizacion(record, legal_to_deal, deals_map, portal_id) -> Dict:
     dt_l_apr_dir = date_entered["date_entered_legal_aprobada_dir"]
     dt_rev_sinco = date_entered["date_entered_revision_sinco"]
     dt_apr_exit  = date_entered["date_entered_aprobado_exitoso"]
+    dt_apr_ger   = date_entered.get("date_entered_aprobado_gerencia")
     dt_apr_nov   = date_entered["date_entered_aprobado_novedades"]
     fecha_apr_dt = dt_from_date(fecha_aprobacion)
 
@@ -504,7 +510,7 @@ def transform_legalizacion(record, legal_to_deal, deals_map, portal_id) -> Dict:
 
     # Ventana de cierre
     en_ventana_cierre = calcular_ventana_cierre(
-        etapa_codigo, dt_apr_exit, dt_apr_nov, fecha_aprobacion)
+        etapa_codigo, dt_apr_exit, dt_apr_nov, fecha_aprobacion, dt_apr_ger)
 
     # Caída
     dt_caida   = date_entered["date_entered_venta_caida"]
@@ -564,6 +570,7 @@ def transform_legalizacion(record, legal_to_deal, deals_map, portal_id) -> Dict:
         "dias_en_legal_aprobada_dir":   dias_en_legal_aprobada_dir,
         "dias_en_revision_sinco":       dias_en_revision_sinco,
         "dias_consignacion_a_aprobacion": dias_consignacion_a_aprobacion,
+        "date_entered_aprobado_gerencia": date_entered.get("date_entered_aprobado_gerencia"),
         "en_ventana_cierre":            en_ventana_cierre,
         "aging_dias":                   aging_dias,
         "hubspot_url":                  hubspot_url,
@@ -624,10 +631,11 @@ def transform_all(records, legal_to_deal, deals_map, portal_id) -> pd.DataFrame:
         print(f"  {'─'*55}")
         for cod, lbl in [("aprobado_exitoso","Aprobadas sin novedades"),
                          ("aprobado_novedades","Aprobadas con novedades"),
+                         ("aprobado_gerencia","Aprobadas por Gerencia Comercial"),
                          ("negocio_rechazado","Rechazadas")]:
             n = (res_df["etapa_codigo"]==cod).sum()
             print(f"  {lbl:<45}  {n:>5}  ({n/n_res*100:5.1f}%)")
-        n_apr  = ((res_df["etapa_codigo"]=="aprobado_exitoso")|(res_df["etapa_codigo"]=="aprobado_novedades")).sum()
+        n_apr  = ((res_df["etapa_codigo"]=="aprobado_exitoso")|(res_df["etapa_codigo"]=="aprobado_novedades")|(res_df["etapa_codigo"]=="aprobado_gerencia")).sum()
         n_vent = res_df["en_ventana_cierre"].sum()
         print(f"  {'KPI 6 — En ventana de cierre':<45}  {int(n_vent):>5}  ({n_vent/n_apr*100 if n_apr else 0:5.1f}% de aprobadas)")
 
