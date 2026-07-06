@@ -423,30 +423,37 @@ function KpiCard({card}:{card:{l:string;v:any;border:string;sub?:string;tip?:str
       background:'white',borderRadius:11,
       border:'1px solid rgba(18,81,96,.07)',
       borderLeft:`3px solid ${border}`,
-      padding:'11px 14px',
+      padding:'13px 16px',
+      minHeight:80,
+      display:'flex',flexDirection:'column',justifyContent:'space-between',
       transition:'box-shadow .18s, transform .18s',
     }}>
-      <p style={{fontSize:9,fontWeight:700,textTransform:'uppercase' as const,
-        letterSpacing:'.07em',color:'rgba(18,81,96,.45)',
-        marginBottom:5,display:'flex',alignItems:'center',gap:3}}>
-        {l}
-        {tip&&<span className="tip" data-tip={tip}
-          style={{cursor:'help',color:'rgba(18,81,96,.3)',fontSize:11,lineHeight:1}}>?</span>}
-      </p>
-      <p style={{fontFamily:`'Funnel Sans',Arial,sans-serif`,fontSize:26,fontWeight:900,
-        color:'#125160',margin:0,lineHeight:1,letterSpacing:'-.03em',
-        fontVariantNumeric:'tabular-nums'}}>
-        {typeof v==='number'?v.toLocaleString('es-CO'):v}
-      </p>
-      {prog!=null&&(
-        <div style={{height:3,background:'rgba(18,81,96,.08)',
-          borderRadius:99,overflow:'hidden',marginTop:5}}>
-          <div style={{height:'100%',borderRadius:99,background:border,
-            width:`${Math.min(prog,100)}%`,
-            transition:'width .8s cubic-bezier(.4,0,.2,1)'}}/>
-        </div>
-      )}
-      {sub&&<p style={{fontSize:10,color:'rgba(18,81,96,.45)',marginTop:4,lineHeight:1.4}}>{sub}</p>}
+      <div>
+        <p style={{fontSize:9,fontWeight:700,textTransform:'uppercase' as const,
+          letterSpacing:'.07em',color:'rgba(18,81,96,.45)',
+          marginBottom:6,display:'flex',alignItems:'center',gap:3}}>
+          {l}
+          {tip&&<span className="tip" data-tip={tip}
+            style={{cursor:'help',color:'rgba(18,81,96,.3)',fontSize:11,lineHeight:1}}>?</span>}
+        </p>
+        <p style={{fontFamily:`'Funnel Sans',Arial,sans-serif`,fontSize:28,fontWeight:900,
+          color:'#125160',margin:0,lineHeight:1,letterSpacing:'-.03em',
+          fontVariantNumeric:'tabular-nums'}}>
+          {typeof v==='number'?v.toLocaleString('es-CO'):v}
+        </p>
+      </div>
+      <div>
+        {prog!=null&&(
+          <div style={{height:3,background:'rgba(18,81,96,.08)',
+            borderRadius:99,overflow:'hidden',marginTop:7}}>
+            <div style={{height:'100%',borderRadius:99,background:border,
+              width:`${Math.min(prog,100)}%`,
+              transition:'width .8s cubic-bezier(.4,0,.2,1)'}}/>
+          </div>
+        )}
+        {sub&&<p style={{fontSize:10,color:'rgba(18,81,96,.45)',
+          marginTop:4,lineHeight:1.4}}>{sub}</p>}
+      </div>
     </div>
   )
 }
@@ -1167,55 +1174,98 @@ export default function Dashboard() {
               )}
             </div>
 
-            {!kpis ? <Sk h={200}/> : (()=>{
-              const ger  = kpis.aprobadas_gerencia  || 0
-              const apr  = kpis.aprobadas_exitoso + kpis.aprobadas_novedades + ger
-              const cards:{l:string;v:any;border:string;sub?:string;tip?:string;prog?:number}[] = [
-                {l:'Total del mes',         v:kpis.total_resolucion,    border:T,
-                  sub:`${apr} aprobadas · ${kpis.rechazadas} rechazadas`,
-                  prog:kpis.meta_negocios>0?pct(kpis.total_resolucion,kpis.meta_negocios):undefined},
-                {l:'Aprobadas sin novedad', v:kpis.aprobadas_exitoso,   border:'#166534',
-                  sub:apr>0?`${pct(kpis.aprobadas_exitoso,apr)}% de aprobadas`:undefined,
-                  prog:apr>0?pct(kpis.aprobadas_exitoso,apr):undefined},
-                {l:'Con novedades',         v:kpis.aprobadas_novedades, border:'#92400E',
-                  sub:apr>0?`${pct(kpis.aprobadas_novedades,apr)}% de aprobadas`:undefined,
-                  prog:apr>0?pct(kpis.aprobadas_novedades,apr):undefined},
-                {l:'Gerencia Comercial',    v:ger,                      border:'#B382FF',
-                  tip:'Aprobados por Gerencia Comercial — Con Novedades. Stage 1394950689.',
-                  sub:apr>0?`${pct(ger,apr)}% de aprobadas`:undefined,
-                  prog:apr>0?pct(ger,apr):undefined},
-                {l:'Rechazadas',            v:kpis.rechazadas,           border:kpis.rechazadas>0?OR:T,sub:undefined},
-                {l:'Ventas caídas',          v:kpis.ventas_caidas,        border:kpis.ventas_caidas>0?'#991B1B':T,sub:undefined},
-                {l:'Ventana de cierre',
-                  v:`${kpis.pct_ventana_cierre}%`,
-                  border:kpis.pct_ventana_cierre>40?'#92400E':AM,
-                  sub:`${kpis.en_ventana_cierre} aprobadas después del día 25`,
-                  tip:'Porcentaje de aprobaciones que ocurren en los últimos días del mes (después del día 25). Un % alto indica concentración al final del mes.',
-                  prog:kpis.pct_ventana_cierre},
-              ]
+            {!kpis ? <Sk h={190}/> : (()=>{
+              const ger = kpis.aprobadas_gerencia || 0
+              const apr = kpis.aprobadas_exitoso + kpis.aprobadas_novedades + ger
+
+              // ── Fila 1: Gauge + 4 cards de aprobación (misma altura) ──────
+              // ── Fila 2: 3 cards de alertas (mismo ancho que las de arriba) ─
+              // Layout: gauge ocupa 1 columna, las cards llenan las restantes.
+              // Usamos un grid de 5 columnas para que las 4 cards de aprobación
+              // quepan junto al gauge, y abajo 3 cards alineadas con las 4.
+
               return (
-                <div style={{display:'grid',gridTemplateColumns:'170px 1fr',gap:12}}>
-                  {/* Gauge */}
-                  <div className="card" style={{padding:'14px 12px',display:'flex',
-                    flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4}}>
-                    <p style={{fontSize:9,fontWeight:700,textTransform:'uppercase',letterSpacing:'.09em',
-                      color:'rgba(18,81,96,.38)',textAlign:'center',marginBottom:2}}>
-                      CUMPLIMIENTO
-                    </p>
-                    <Gauge pct={kpis.pct_cumplimiento} meta={kpis.meta_negocios} onEdit={()=>setMeta(true)}/>
+                <div style={{display:'flex',flexDirection:'column',gap:8}}>
+
+                  {/* ── FILA 1: Gauge + 4 KPIs principales ─────────────── */}
+                  <div style={{
+                    display:'grid',
+                    gridTemplateColumns:'160px repeat(4,1fr)',
+                    gap:8,
+                    alignItems:'stretch',
+                  }}>
+                    {/* Gauge */}
+                    <div className="card" style={{
+                      padding:'16px 12px',
+                      display:'flex',flexDirection:'column',
+                      alignItems:'center',justifyContent:'center',
+                      gridRow:'1',
+                    }}>
+                      <p style={{fontSize:9,fontWeight:700,textTransform:'uppercase',
+                        letterSpacing:'.09em',color:'rgba(18,81,96,.38)',
+                        textAlign:'center',marginBottom:6}}>
+                        CUMPLIMIENTO
+                      </p>
+                      <Gauge pct={kpis.pct_cumplimiento} meta={kpis.meta_negocios} onEdit={()=>setMeta(true)}/>
+                    </div>
+
+                    {/* Card 1: Total */}
+                    <KpiCard card={{
+                      l:'Total del mes', v:kpis.total_resolucion, border:T,
+                      sub:`${apr} aprobadas · ${kpis.rechazadas} rechazadas`,
+                      prog:kpis.meta_negocios>0?pct(kpis.total_resolucion,kpis.meta_negocios):undefined,
+                    }}/>
+                    {/* Card 2: Sin novedad */}
+                    <KpiCard card={{
+                      l:'Aprobadas sin novedad', v:kpis.aprobadas_exitoso, border:'#166534',
+                      sub:apr>0?`${pct(kpis.aprobadas_exitoso,apr)}% de aprobadas`:undefined,
+                      prog:apr>0?pct(kpis.aprobadas_exitoso,apr):undefined,
+                    }}/>
+                    {/* Card 3: Con novedades */}
+                    <KpiCard card={{
+                      l:'Con novedades', v:kpis.aprobadas_novedades, border:'#92400E',
+                      sub:apr>0?`${pct(kpis.aprobadas_novedades,apr)}% de aprobadas`:undefined,
+                      prog:apr>0?pct(kpis.aprobadas_novedades,apr):undefined,
+                    }}/>
+                    {/* Card 4: Gerencia */}
+                    <KpiCard card={{
+                      l:'Gerencia Comercial', v:ger, border:'#B382FF',
+                      tip:'Aprobados por Gerencia Comercial — Con Novedades (stage 1394950689).',
+                      sub:apr>0?`${pct(ger,apr)}% de aprobadas`:undefined,
+                      prog:apr>0?pct(ger,apr):undefined,
+                    }}/>
                   </div>
 
-                  {/* 7 KPI cards — grid 4+3 */}
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
-                    {cards.slice(0,4).map(k=>(
-                      <KpiCard key={k.l} card={k}/>
-                    ))}
+                  {/* ── FILA 2: 3 KPIs de alerta — alineados con las cards de arriba ── */}
+                  {/* Columna 0 vacía (bajo el gauge), luego 3 cards en col 1-3 */}
+                  <div style={{
+                    display:'grid',
+                    gridTemplateColumns:'160px repeat(4,1fr)',
+                    gap:8,
+                  }}>
+                    {/* Espaciador transparente bajo el gauge */}
+                    <div/>
+                    {/* Card 5: Rechazadas */}
+                    <KpiCard card={{
+                      l:'Rechazadas', v:kpis.rechazadas, border:kpis.rechazadas>0?OR:T,
+                    }}/>
+                    {/* Card 6: Ventas caídas */}
+                    <KpiCard card={{
+                      l:'Ventas caídas', v:kpis.ventas_caidas, border:kpis.ventas_caidas>0?'#991B1B':T,
+                    }}/>
+                    {/* Card 7: Ventana de cierre */}
+                    <KpiCard card={{
+                      l:'Ventana de cierre',
+                      v:`${kpis.pct_ventana_cierre}%`,
+                      border:kpis.pct_ventana_cierre>40?'#92400E':AM,
+                      sub:`${kpis.en_ventana_cierre} aprobadas después del día 25`,
+                      tip:'% de aprobaciones en los últimos días del mes (día 25+). Un % alto indica que el equipo cierra al final del mes.',
+                      prog:kpis.pct_ventana_cierre,
+                    }}/>
+                    {/* Celda vacía en col 4 para mantener el grid equilibrado */}
+                    <div/>
                   </div>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginTop:8}}>
-                    {cards.slice(4).map(k=>(
-                      <KpiCard key={k.l} card={k}/>
-                    ))}
-                  </div>
+
                 </div>
               )
             })()}
