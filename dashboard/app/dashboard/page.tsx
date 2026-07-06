@@ -33,12 +33,14 @@ const STAGE_LABEL: Record<string,string> = {
   consignacion:'Consignación', legal_espera:'Espera Director',
   legal_aprobada_dir:'Aprobada Dir.', revision_sinco:'Revisión SINCO',
   aprobado_exitoso:'Aprobado ✓', aprobado_novedades:'Con Novedades',
+  aprobado_gerencia:'Aprob. Gerencia',
   negocio_rechazado:'Rechazado', venta_caida:'Venta Caída',
 }
 const STAGE_COLOR: Record<string,string> = {
   consignacion:T, legal_espera:'#1a6b7a',
   legal_aprobada_dir:'#1a7d6e', revision_sinco:'#279752',
   aprobado_exitoso:'#166534', aprobado_novedades:'#4d7c0f',
+  aprobado_gerencia:'#B382FF',
   negocio_rechazado:OR, venta_caida:'#991B1B',
 }
 const PIPELINE_STAGES = ['consignacion','legal_espera','legal_aprobada_dir','revision_sinco']
@@ -411,6 +413,44 @@ async function exportRechazadosXLSX(rows:any[]) {
 /* ════════════════════════════════════════════════════════════════════
    MAIN DASHBOARD
 ════════════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════════
+   KPI CARD — componente reutilizable
+════════════════════════════════════════════════════════════════════ */
+function KpiCard({card}:{card:{l:string;v:any;border:string;sub?:string;tip?:string;prog?:number}}) {
+  const {l,v,border,sub,tip,prog} = card
+  return (
+    <div style={{
+      background:'white',borderRadius:11,
+      border:'1px solid rgba(18,81,96,.07)',
+      borderLeft:`3px solid ${border}`,
+      padding:'11px 14px',
+      transition:'box-shadow .18s, transform .18s',
+    }}>
+      <p style={{fontSize:9,fontWeight:700,textTransform:'uppercase' as const,
+        letterSpacing:'.07em',color:'rgba(18,81,96,.45)',
+        marginBottom:5,display:'flex',alignItems:'center',gap:3}}>
+        {l}
+        {tip&&<span className="tip" data-tip={tip}
+          style={{cursor:'help',color:'rgba(18,81,96,.3)',fontSize:11,lineHeight:1}}>?</span>}
+      </p>
+      <p style={{fontFamily:`'Funnel Sans',Arial,sans-serif`,fontSize:26,fontWeight:900,
+        color:'#125160',margin:0,lineHeight:1,letterSpacing:'-.03em',
+        fontVariantNumeric:'tabular-nums'}}>
+        {typeof v==='number'?v.toLocaleString('es-CO'):v}
+      </p>
+      {prog!=null&&(
+        <div style={{height:3,background:'rgba(18,81,96,.08)',
+          borderRadius:99,overflow:'hidden',marginTop:5}}>
+          <div style={{height:'100%',borderRadius:99,background:border,
+            width:`${Math.min(prog,100)}%`,
+            transition:'width .8s cubic-bezier(.4,0,.2,1)'}}/>
+        </div>
+      )}
+      {sub&&<p style={{fontSize:10,color:'rgba(18,81,96,.45)',marginTop:4,lineHeight:1.4}}>{sub}</p>}
+    </div>
+  )
+}
+
 /* ════════════════════════════════════════════════════════════════════
    RECHAZADOS DRAWER — listado completo de rechazados y caídas
 ════════════════════════════════════════════════════════════════════ */
@@ -915,7 +955,7 @@ export default function Dashboard() {
           onClose={()=>setMeta(false)}
           onSaved={x=>{
             setK((p:any)=>p?{...p,meta_negocios:x,
-              pct_cumplimiento:x>0?parseFloat(((p.aprobadas_exitoso+p.aprobadas_novedades)/x*100).toFixed(1)):0}:p)
+              pct_cumplimiento:x>0?parseFloat(((p.aprobadas_exitoso+p.aprobadas_novedades+(p.aprobadas_gerencia||0))/x*100).toFixed(1)):0}:p)
             setMeta(false)
           }}/>
       )}
@@ -1128,19 +1168,24 @@ export default function Dashboard() {
             </div>
 
             {!kpis ? <Sk h={200}/> : (()=>{
-              const apr=kpis.aprobadas_exitoso+kpis.aprobadas_novedades
+              const ger  = kpis.aprobadas_gerencia  || 0
+              const apr  = kpis.aprobadas_exitoso + kpis.aprobadas_novedades + ger
               const cards:{l:string;v:any;border:string;sub?:string;tip?:string;prog?:number}[] = [
-                {l:'Total del mes',      v:kpis.total_resolucion,    border:T,
+                {l:'Total del mes',         v:kpis.total_resolucion,    border:T,
                   sub:`${apr} aprobadas · ${kpis.rechazadas} rechazadas`,
                   prog:kpis.meta_negocios>0?pct(kpis.total_resolucion,kpis.meta_negocios):undefined},
-                {l:'Aprobadas sin novedad',v:kpis.aprobadas_exitoso, border:'#166534',
+                {l:'Aprobadas sin novedad', v:kpis.aprobadas_exitoso,   border:'#166534',
                   sub:apr>0?`${pct(kpis.aprobadas_exitoso,apr)}% de aprobadas`:undefined,
                   prog:apr>0?pct(kpis.aprobadas_exitoso,apr):undefined},
-                {l:'Aprobadas con novedad',v:kpis.aprobadas_novedades,border:'#92400E',
+                {l:'Con novedades',         v:kpis.aprobadas_novedades, border:'#92400E',
                   sub:apr>0?`${pct(kpis.aprobadas_novedades,apr)}% de aprobadas`:undefined,
                   prog:apr>0?pct(kpis.aprobadas_novedades,apr):undefined},
-                {l:'Rechazadas',         v:kpis.rechazadas,          border:kpis.rechazadas>0?OR:T,sub:undefined},
-                {l:'Ventas caídas',       v:kpis.ventas_caidas,       border:kpis.ventas_caidas>0?'#991B1B':T,sub:undefined},
+                {l:'Gerencia Comercial',    v:ger,                      border:'#B382FF',
+                  tip:'Aprobados por Gerencia Comercial — Con Novedades. Stage 1394950689.',
+                  sub:apr>0?`${pct(ger,apr)}% de aprobadas`:undefined,
+                  prog:apr>0?pct(ger,apr):undefined},
+                {l:'Rechazadas',            v:kpis.rechazadas,           border:kpis.rechazadas>0?OR:T,sub:undefined},
+                {l:'Ventas caídas',          v:kpis.ventas_caidas,        border:kpis.ventas_caidas>0?'#991B1B':T,sub:undefined},
                 {l:'Ventana de cierre',
                   v:`${kpis.pct_ventana_cierre}%`,
                   border:kpis.pct_ventana_cierre>40?'#92400E':AM,
@@ -1160,49 +1205,196 @@ export default function Dashboard() {
                     <Gauge pct={kpis.pct_cumplimiento} meta={kpis.meta_negocios} onEdit={()=>setMeta(true)}/>
                   </div>
 
-                  {/* 6 KPI cards — 3 columnas × 2 filas, más compactas */}
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
-                    {cards.map(k=>(
-                      <div key={k.l} style={{
-                        background:'white',borderRadius:11,
-                        border:'1px solid rgba(18,81,96,.07)',
-                        borderLeft:`3px solid ${k.border}`,
-                        padding:'11px 14px',
-                        transition:'box-shadow .18s',
-                      }}>
-                        <p style={{fontSize:9,fontWeight:700,textTransform:'uppercase',
-                          letterSpacing:'.07em',color:'rgba(18,81,96,.45)',
-                          marginBottom:5,display:'flex',alignItems:'center',gap:3}}>
-                          {k.l}
-                          {k.tip&&<span className="tip" data-tip={k.tip}
-                            style={{cursor:'help',color:'rgba(18,81,96,.3)',fontSize:11,lineHeight:1}}>?</span>}
-                        </p>
-                        {/* Número más pequeño y elegante */}
-                        <p style={{
-                          fontFamily:F,fontSize:26,fontWeight:900,color:T,
-                          margin:0,lineHeight:1,letterSpacing:'-.03em',
-                          fontVariantNumeric:'tabular-nums',
-                        }}>
-                          {typeof k.v==='number'?fN(k.v):k.v}
-                        </p>
-                        {k.prog!=null&&(
-                          <div style={{height:3,background:'rgba(18,81,96,.08)',
-                            borderRadius:99,overflow:'hidden',marginTop:5}}>
-                            <div style={{height:'100%',borderRadius:99,
-                              background:k.border,
-                              width:`${Math.min(k.prog,100)}%`,
-                              transition:'width .8s cubic-bezier(.4,0,.2,1)'}}/>
-                          </div>
-                        )}
-                        {k.sub&&<p style={{fontSize:10,color:'rgba(18,81,96,.45)',
-                          marginTop:4,lineHeight:1.4}}>{k.sub}</p>}
-                      </div>
+                  {/* 7 KPI cards — grid 4+3 */}
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
+                    {cards.slice(0,4).map(k=>(
+                      <KpiCard key={k.l} card={k}/>
+                    ))}
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginTop:8}}>
+                    {cards.slice(4).map(k=>(
+                      <KpiCard key={k.l} card={k}/>
                     ))}
                   </div>
                 </div>
               )
             })()}
           </section>
+
+          {/* ══ 1b. SEMÁFORO DE DISTRIBUCIÓN (para la junta) ══════════ */}
+          {kpis&&(()=>{
+            const ger  = kpis.aprobadas_gerencia  || 0
+            const apr  = kpis.aprobadas_exitoso + kpis.aprobadas_novedades + ger
+            if (apr === 0) return null
+
+            const segmentos = [
+              {
+                label: 'Aprobado sin novedades',
+                sub:   'Todo correcto ✓',
+                v:     kpis.aprobadas_exitoso,
+                col:   '#166534',
+                bg:    'rgba(22,101,52,.08)',
+                icon:  '🟢',
+              },
+              {
+                label: 'Aprobado con novedades',
+                sub:   'Requiere seguimiento',
+                v:     kpis.aprobadas_novedades,
+                col:   '#92400E',
+                bg:    'rgba(146,64,14,.08)',
+                icon:  '🟡',
+              },
+              {
+                label: 'Aprobado — Gerencia Comercial',
+                sub:   'Decisión de gerencia',
+                v:     ger,
+                col:   '#7c3aed',
+                bg:    'rgba(179,130,255,.1)',
+                icon:  '🟣',
+              },
+            ]
+
+            // Ángulos para el arco SVG del semáforo circular
+            const TOTAL_DEG = 270  // arco de 270° total
+            const START_DEG = -225 // arriba-izquierda
+            function polarToXY(deg: number, r: number, cx: number, cy: number) {
+              const rad = (deg * Math.PI) / 180
+              return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }
+            }
+            function buildArc(startDeg: number, sweepDeg: number, r: number, cx: number, cy: number) {
+              if (sweepDeg <= 0) return ''
+              const s = polarToXY(startDeg, r, cx, cy)
+              const e = polarToXY(startDeg + sweepDeg, r, cx, cy)
+              const largeArc = sweepDeg > 180 ? 1 : 0
+              return `M${s.x.toFixed(2)} ${s.y.toFixed(2)} A${r} ${r} 0 ${largeArc} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`
+            }
+
+            let currentDeg = START_DEG
+            const arcs = segmentos.map(s => {
+              const sweep = (s.v / apr) * TOTAL_DEG
+              const path  = buildArc(currentDeg, sweep - 2, 52, 70, 70) // -2 gap visual
+              const start = currentDeg
+              currentDeg += sweep
+              return { ...s, sweep, path, pct: Math.round(s.v / apr * 100) }
+            })
+
+            return (
+              <section style={{marginBottom:4}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+                  <div className="sec-bar"/>
+                  <div>
+                    <h2 style={{fontSize:13,fontWeight:900,color:T,margin:0,
+                      textTransform:'uppercase',letterSpacing:'.04em'}}>
+                      SEMÁFORO DE DISTRIBUCIÓN
+                    </h2>
+                    <p style={{fontSize:10,color:'rgba(18,81,96,.5)',marginTop:1}}>
+                      Distribución de las {apr} aprobaciones del mes · vista para junta directiva
+                    </p>
+                  </div>
+                </div>
+
+                <div className="card" style={{padding:'20px 24px'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:32,flexWrap:'wrap'}}>
+
+                    {/* Gráfico circular tipo semáforo */}
+                    <div style={{flexShrink:0,position:'relative'}}>
+                      <svg width="140" height="140" viewBox="0 0 140 140"
+                        style={{overflow:'visible'}}>
+                        {/* Track vacío */}
+                        <path d={buildArc(START_DEG, TOTAL_DEG, 52, 70, 70)}
+                          fill="none" stroke="rgba(18,81,96,.07)" strokeWidth="14"
+                          strokeLinecap="round"/>
+                        {/* Segmentos */}
+                        {arcs.filter(a=>a.path).map((a,i)=>(
+                          <path key={i} d={a.path} fill="none" stroke={a.col}
+                            strokeWidth="14" strokeLinecap="round"
+                            style={{transition:'stroke-dasharray .8s'}}/>
+                        ))}
+                        {/* Centro */}
+                        <text x="70" y="64" textAnchor="middle"
+                          fontSize="22" fontWeight="900"
+                          fontFamily={F} fill={T}>{apr}</text>
+                        <text x="70" y="78" textAnchor="middle"
+                          fontSize="9" fontWeight="600"
+                          fontFamily={F} fill="rgba(18,81,96,.45)">APROBADAS</text>
+                        <text x="70" y="90" textAnchor="middle"
+                          fontSize="8" fontFamily={F} fill="rgba(18,81,96,.35)">
+                          {kpis.meta_negocios>0?`meta ${fN(kpis.meta_negocios)}`:'sin meta'}
+                        </text>
+                      </svg>
+                    </div>
+
+                    {/* Leyenda + métricas */}
+                    <div style={{flex:1,display:'flex',flexDirection:'column',gap:10,minWidth:280}}>
+                      {arcs.map((a,i)=>(
+                        <div key={i} style={{
+                          display:'flex',alignItems:'center',gap:12,
+                          padding:'10px 14px',borderRadius:10,
+                          background:a.bg,border:`1px solid ${a.col}22`,
+                        }}>
+                          {/* Icono semáforo */}
+                          <span style={{fontSize:20,flexShrink:0}}>{a.icon}</span>
+                          {/* Texto */}
+                          <div style={{flex:1}}>
+                            <p style={{fontSize:12,fontWeight:700,color:a.col,
+                              margin:0,lineHeight:1.3}}>{a.label}</p>
+                            <p style={{fontSize:10,color:'rgba(18,81,96,.5)',
+                              margin:'2px 0 0'}}>{a.sub}</p>
+                          </div>
+                          {/* Barra proporcional */}
+                          <div style={{width:80,flexShrink:0}}>
+                            <div style={{height:5,borderRadius:99,
+                              background:'rgba(18,81,96,.08)',overflow:'hidden',marginBottom:3}}>
+                              <div style={{height:'100%',borderRadius:99,background:a.col,
+                                width:`${a.pct}%`,transition:'width .8s cubic-bezier(.4,0,.2,1)'}}/>
+                            </div>
+                            <p style={{fontSize:10,color:'rgba(18,81,96,.45)',
+                              textAlign:'right',margin:0}}>
+                              {a.pct}%
+                            </p>
+                          </div>
+                          {/* Número */}
+                          <div style={{textAlign:'right',flexShrink:0,minWidth:36}}>
+                            <p style={{fontFamily:F,fontSize:22,fontWeight:900,
+                              color:a.col,margin:0,lineHeight:1}}>{fN(a.v)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Métricas rápidas para junta */}
+                    <div style={{display:'flex',flexDirection:'column',gap:8,flexShrink:0,minWidth:130}}>
+                      {[
+                        ['Tasa de aprobación', apr>0&&kpis.total_resolucion>0
+                          ? `${Math.round(apr/kpis.total_resolucion*100)}%` : '—',
+                          T,'del total de resoluciones'],
+                        ['Sin ninguna novedad', apr>0
+                          ? `${Math.round(kpis.aprobadas_exitoso/apr*100)}%` : '—',
+                          '#166534','aprobaciones limpias'],
+                        ['Con alguna novedad', apr>0
+                          ? `${Math.round((kpis.aprobadas_novedades+ger)/apr*100)}%` : '—',
+                          '#92400E','requieren gestión'],
+                      ].map(([l,v,c,sub])=>(
+                        <div key={l as string} style={{
+                          background:'white',borderRadius:9,padding:'10px 12px',
+                          border:'1px solid rgba(18,81,96,.08)',
+                        }}>
+                          <p style={{fontSize:9,color:'rgba(18,81,96,.4)',
+                            textTransform:'uppercase',letterSpacing:'.06em',
+                            marginBottom:3}}>{l}</p>
+                          <p style={{fontSize:18,fontWeight:900,color:c as string,
+                            margin:0,lineHeight:1}}>{v}</p>
+                          <p style={{fontSize:9,color:'rgba(18,81,96,.4)',
+                            marginTop:2}}>{sub}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                  </div>
+                </div>
+              </section>
+            )
+          })()}
 
           {/* ══ 2. FLUJO DE PROYECTOS ════════════════════════════════ */}
           <section>
@@ -1271,7 +1463,7 @@ export default function Dashboard() {
                     <thead>
                       <tr>
                         <th colSpan={3} style={{textAlign:'left'}}>Identificación</th>
-                        <th colSpan={3} style={{textAlign:'center',color:'rgba(219,255,105,.7)'}}>Aprobadas</th>
+                        <th colSpan={4} style={{textAlign:'center',color:'rgba(219,255,105,.7)'}}>Aprobadas</th>
                         <th colSpan={2} style={{textAlign:'center',color:'rgba(255,255,255,.5)'}}>Proceso</th>
                         <th colSpan={2} style={{textAlign:'center',color:'rgba(255,121,90,.8)'}}>Alertas</th>
                         <th colSpan={2} style={{textAlign:'center',color:'rgba(255,255,255,.4)'}}>Valor · Tiempo</th>
@@ -1283,6 +1475,7 @@ export default function Dashboard() {
                         <th className={sortK==='aprobadas'?'sorted':''} onClick={()=>srt('aprobadas')} style={{textAlign:'right'}}>Total{arr('aprobadas')}</th>
                         <th style={{textAlign:'right'}}>Sin novedad</th>
                         <th style={{textAlign:'right'}}>Con novedad</th>
+                        <th style={{textAlign:'right',color:'rgba(179,130,255,.8)'}}>Gerencia</th>
                         <th className={sortK==='pipeline_activo'?'sorted':''} onClick={()=>srt('pipeline_activo')} style={{textAlign:'right'}}>Pipeline{arr('pipeline_activo')}</th>
                         <th style={{textAlign:'right'}}>% total</th>
                         <th className={sortK==='rechazadas'?'sorted':''} onClick={()=>srt('rechazadas')} style={{textAlign:'right'}}>Rechaz.{arr('rechazadas')}</th>
@@ -1314,6 +1507,11 @@ export default function Dashboard() {
                             <td style={{textAlign:'right'}}>
                               <span style={{background:'rgba(146,64,14,.1)',color:'#92400E',padding:'1px 7px',borderRadius:5,fontWeight:700,fontSize:11}}>{fN(r.con_novedades)}</span>
                             </td>
+                            <td style={{textAlign:'right'}}>
+                              {(r.aprobado_gerencia||0)>0
+                                ?<span style={{background:'rgba(179,130,255,.12)',color:'#7c3aed',padding:'1px 7px',borderRadius:5,fontWeight:700,fontSize:11}}>{fN(r.aprobado_gerencia)}</span>
+                                :<span style={{color:'rgba(18,81,96,.2)',fontSize:11}}>—</span>}
+                            </td>
                             <td style={{textAlign:'right',color:'#C2410C',fontWeight:500,fontSize:12}}>{fN(r.pipeline_activo)}</td>
                             <td style={{textAlign:'right',fontSize:11,color:'rgba(18,81,96,.5)'}}>{p}%</td>
                             <td style={{textAlign:'right'}}>
@@ -1338,7 +1536,7 @@ export default function Dashboard() {
                           TOTAL — {proy.proyectos?.length||0} proyectos
                         </td>
                         <td style={{textAlign:'right',color:'rgba(219,255,105,.9)',fontSize:14,fontWeight:900}}>{fN(proy.total_aprobadas)}</td>
-                        <td colSpan={8}/>
+                        <td colSpan={9}/>
                       </tr>
                     </tfoot>
                   </table>
@@ -1830,10 +2028,10 @@ export default function Dashboard() {
               <div style={{display:'flex',gap:4,background:'rgba(18,81,96,.07)',
                 borderRadius:9,padding:3,border:'1px solid rgba(18,81,96,.1)'}}>
                 {([
-                  ['todos',    'Todos'],
-                  ['pipeline', 'Pipeline'],
+                  ['todos',     'Todos'],
+                  ['pipeline',  'Pipeline'],
                   ['resolucion','Aprobadas'],
-                  ['caida',    'Caídas'],
+                  ['caida',     'Caídas'],
                 ] as const).map(([g,l])=>(
                   <button key={g} onClick={()=>{setTabDet(g);fetchDet(1,g)}}
                     style={{padding:'4px 10px',borderRadius:7,fontSize:11,fontWeight:700,
