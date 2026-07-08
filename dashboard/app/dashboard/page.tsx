@@ -459,6 +459,388 @@ function KpiCard({card}:{card:{l:string;v:any;border:string;sub?:string;tip?:str
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   VENTANA DRAWER — desglose por proyecto + clientes en ventana de cierre
+════════════════════════════════════════════════════════════════════ */
+function VentanaDrawer({data,loading,onClose,onSelectRow,anio,mes}:{
+  data:any;loading:boolean;onClose:()=>void;
+  onSelectRow:(r:any)=>void;anio:number;mes:number
+}) {
+  const [vistaActiva,setVista]=useState<'proyectos'|'clientes'>('proyectos')
+  const [proyFiltro,  setPF  ]=useState<string>('')
+  const AM='#A1D81A'
+  const T ='#125160'
+  const A ='#DBFF69'
+  const OR='#FF795A'
+  const F =`'Funnel Sans',Arial,sans-serif`
+  const fN=(v:any)=>v==null?'—':Number(v).toLocaleString('es-CO')
+  const fM=(v:any)=>!v||!Number(v)?'—':`$${(Number(v)/1e6).toLocaleString('es-CO',{maximumFractionDigits:1})}M`
+  const dtF=(s:string|null)=>s?new Date(s).toLocaleDateString('es-CO',{day:'numeric',month:'short',year:'2-digit'}):' — '
+  const STAGE_COL:Record<string,string>={aprobado_exitoso:'#166534',aprobado_novedades:'#92400E',aprobado_gerencia:'#7c3aed'}
+  const STAGE_LBL:Record<string,string>={aprobado_exitoso:'Aprobado ✓',aprobado_novedades:'Con Novedades',aprobado_gerencia:'Gerencia'}
+
+  const porProy   = data?.por_proyecto || []
+  const clientes  = data?.clientes     || []
+  const total     = data?.total        || 0
+  const maxProy   = Math.max(...porProy.map((p:any)=>p.total),1)
+
+  // Clientes filtrados por proyecto seleccionado
+  const clientesFiltrados = proyFiltro
+    ? clientes.filter((c:any)=>c.proyecto===proyFiltro)
+    : clientes
+
+  // Export Excel ventana
+  async function exportVentana(soloProyecto?:string) {
+    const XLSX = await import('xlsx')
+    const rows = (soloProyecto ? clientes.filter((c:any)=>c.proyecto===soloProyecto) : clientes)
+      .map((c:any)=>({
+        'Proyecto':           c.proyecto,
+        'Director':           c.director,
+        'Ciudad':             c.ciudad,
+        'Comprador':          c.nombrecomprador,
+        'Documento':          c.documento_comprador_1,
+        'Unidad':             c.numero_unidad || c.torre || '',
+        'Stage':              c.etapa_label,
+        'Día Aprobación':     c.dia_aprobacion,
+        'Fecha Aprobación':   c.fecha_aprobacion_final,
+        'Valor COP':          c.valor_del_inmueble || '',
+        'Canal':              c.canal_atribucion,
+        'Motivo Observación': c.motivo_de_observacion,
+        'URL HubSpot':        c.hubspot_url,
+      }))
+    if (!rows.length) return
+    const ws = XLSX.utils.json_to_sheet(rows)
+    ws['!cols'] = [24,22,14,28,18,12,16,14,16,18,18,40,40].map(w=>({wch:w}))
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb,ws,'Ventana de Cierre')
+    const fname = soloProyecto
+      ? `Conaltura_Ventana_${soloProyecto.slice(0,20).replace(/\s+/g,'_')}.xlsx`
+      : `Conaltura_VentanaCierre_${anio}_${String(mes).padStart(2,'0')}.xlsx`
+    XLSX.writeFile(wb,fname)
+  }
+
+  const MESF=['''Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
+  return (
+    <>
+      <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(18,81,96,.35)',
+        backdropFilter:'blur(4px)',zIndex:40}}/>
+      <div style={{
+        position:'fixed',right:0,top:0,bottom:0,width:680,maxWidth:'97vw',zIndex:41,
+        background:'#F4F0E5',borderLeft:`3px solid ${AM}`,
+        display:'flex',flexDirection:'column',fontFamily:F,
+        boxShadow:'-24px 0 60px rgba(18,81,96,.15)',
+      }}>
+
+        {/* ── Header ──────────────────────────────────────────────────── */}
+        <div style={{padding:'18px 22px 14px',borderBottom:'1px solid rgba(18,81,96,.08)',
+          background:'white'}}>
+          <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
+            <div style={{flex:1}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:5}}>
+                <span style={{fontSize:10,fontWeight:700,background:'rgba(161,216,26,.15)',
+                  color:'#4d7c0f',padding:'2px 10px',borderRadius:99,
+                  border:'1px solid rgba(161,216,26,.3)'}}>
+                  Ventana de Cierre · Día 25+
+                </span>
+              </div>
+              <h3 style={{fontSize:16,fontWeight:900,color:T,margin:'0 0 3px'}}>
+                Aprobaciones en ventana de cierre
+              </h3>
+              <p style={{fontSize:11,color:'rgba(18,81,96,.5)'}}>
+                {MESF[mes]} {anio} · {loading?'Cargando…':`${total} clientes en ${porProy.length} proyectos`}
+              </p>
+            </div>
+            <div style={{display:'flex',gap:8,alignItems:'center',flexShrink:0}}>
+              <button onClick={()=>exportVentana()}
+                disabled={loading||!total}
+                style={{display:'flex',alignItems:'center',gap:5,padding:'6px 12px',
+                  borderRadius:8,border:'1px solid rgba(18,81,96,.2)',cursor:'pointer',
+                  background:A,color:T,fontSize:11,fontWeight:700,fontFamily:F,
+                  opacity:loading||!total?.5:1}}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M8 12l4 4 4-4M12 4v12"
+                    stroke="#125160" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                Descargar todo
+              </button>
+              <button onClick={onClose} style={{
+                background:'#F4F0E5',border:'1px solid rgba(18,81,96,.14)',
+                borderRadius:8,color:'rgba(18,81,96,.5)',cursor:'pointer',
+                width:30,height:30,display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div style={{display:'flex',gap:4,background:'rgba(18,81,96,.07)',
+            borderRadius:9,padding:3,marginTop:12,width:'fit-content'}}>
+            {([
+              ['proyectos',`Por proyecto (${porProy.length})`],
+              ['clientes', `Clientes individuales (${total})`],
+            ] as const).map(([k,l])=>(
+              <button key={k} onClick={()=>{setVista(k);setPF('')}}
+                style={{padding:'5px 14px',borderRadius:7,fontSize:11,fontWeight:700,
+                  cursor:'pointer',border:'none',fontFamily:F,
+                  background:vistaActiva===k?A:'transparent',
+                  color:vistaActiva===k?T:'rgba(18,81,96,.6)'}}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Body ────────────────────────────────────────────────────── */}
+        <div style={{flex:1,overflowY:'auto',padding:'14px 18px'}}>
+
+          {loading ? (
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {Array(5).fill(0).map((_,i)=>(
+                <div key={i} style={{height:64,background:'rgba(18,81,96,.06)',borderRadius:10,
+                  animation:'shimmer 1.5s ease infinite'}}/>
+              ))}
+            </div>
+          ) : vistaActiva==='proyectos' ? (
+
+            /* ─── VISTA PROYECTOS ─────────────────────────────────────── */
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {porProy.length===0 ? (
+                <div style={{textAlign:'center',padding:'40px 0',
+                  color:'rgba(18,81,96,.35)',fontSize:13}}>
+                  Sin aprobaciones en ventana de cierre para este período
+                </div>
+              ) : porProy.map((p:any,i:number)=>{
+                const pctW=Math.max((p.total/maxProy)*100,6)
+                const col=[T,'#1a6b7a','#1a7d6e','#279752',AM,'#4d7c0f'][i%6]
+                return (
+                  <div key={p.proyecto} style={{
+                    background:'white',borderRadius:12,
+                    border:'1px solid rgba(18,81,96,.07)',
+                    borderLeft:`3px solid ${col}`,
+                    overflow:'hidden',
+                  }}>
+                    {/* Cabecera del proyecto */}
+                    <div style={{padding:'12px 16px 10px',
+                      display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:3}}>
+                          <p style={{fontSize:13,fontWeight:900,color:T,margin:0}}>{p.proyecto}</p>
+                          <span style={{fontSize:10,color:'rgba(18,81,96,.45)'}}>
+                            {p.ciudad} · {p.director?.split(' ')[0]} {p.director?.split(' ').slice(-1)[0]}
+                          </span>
+                        </div>
+                        {/* Barra proporcional */}
+                        <div style={{height:5,borderRadius:99,
+                          background:'rgba(18,81,96,.07)',overflow:'hidden',marginTop:6}}>
+                          <div style={{width:`${pctW}%`,height:'100%',borderRadius:99,
+                            background:col,transition:'width .7s cubic-bezier(.4,0,.2,1)'}}/>
+                        </div>
+                        {/* Desglose por tipo */}
+                        <div style={{display:'flex',gap:10,marginTop:5,flexWrap:'wrap'}}>
+                          {[
+                            [p.exitosas,    'Sin novedad',  '#166534','rgba(22,101,52,.1)'],
+                            [p.con_novedades,'Con novedad', '#92400E','rgba(146,64,14,.1)'],
+                            [p.gerencia,    'Gerencia',     '#7c3aed','rgba(179,130,255,.12)'],
+                          ].filter(([v])=>(v as number)>0).map(([v,l,c,bg])=>(
+                            <span key={l as string} style={{
+                              background:bg as string,color:c as string,
+                              padding:'2px 8px',borderRadius:99,
+                              fontSize:10,fontWeight:700,
+                              border:`1px solid ${(c as string)+'22'}`
+                            }}>
+                              {v} {l}
+                            </span>
+                          ))}
+                          {p.dia_promedio&&(
+                            <span style={{fontSize:10,color:'rgba(18,81,96,.45)'}}>
+                              Día prom. {p.dia_promedio}
+                            </span>
+                          )}
+                          {p.valor_total&&(
+                            <span style={{fontSize:10,color:'rgba(18,81,96,.45)'}}>
+                              {fM(p.valor_total)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Número grande + acciones */}
+                      <div style={{textAlign:'right',flexShrink:0}}>
+                        <p style={{fontFamily:F,fontSize:28,fontWeight:900,
+                          color:col,margin:'0 0 6px',lineHeight:1}}>{fN(p.total)}</p>
+                        <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
+                          <button
+                            onClick={()=>{setVista('clientes');setPF(p.proyecto)}}
+                            style={{fontSize:10,fontWeight:700,padding:'3px 10px',
+                              borderRadius:7,border:`1px solid ${col}33`,cursor:'pointer',
+                              background:`${col}10`,color:col,fontFamily:F}}>
+                            Ver clientes
+                          </button>
+                          <button onClick={()=>exportVentana(p.proyecto)}
+                            style={{fontSize:10,fontWeight:700,padding:'3px 10px',
+                              borderRadius:7,border:'1px solid rgba(18,81,96,.2)',cursor:'pointer',
+                              background:A,color:T,fontFamily:F}}
+                            title="Descargar este proyecto (.xlsx)">
+                            ↓ xlsx
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Resumen total al pie */}
+              {porProy.length>0&&(
+                <div style={{background:T,borderRadius:10,padding:'12px 16px',
+                  display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}>
+                  <span style={{fontSize:12,color:'rgba(255,255,255,.7)',fontWeight:600}}>
+                    Total en ventana de cierre
+                  </span>
+                  <div style={{display:'flex',gap:20,alignItems:'center'}}>
+                    {[
+                      [porProy.reduce((s:number,p:any)=>s+p.exitosas,0),   'Sin novedad', '#86efac'],
+                      [porProy.reduce((s:number,p:any)=>s+p.con_novedades,0),'Con novedad','#fde68a'],
+                      [porProy.reduce((s:number,p:any)=>s+p.gerencia,0),   'Gerencia',   '#d8b4fe'],
+                    ].filter(([v])=>(v as number)>0).map(([v,l,c])=>(
+                      <div key={l as string} style={{textAlign:'center'}}>
+                        <p style={{fontFamily:F,fontSize:18,fontWeight:900,
+                          color:c as string,margin:0,lineHeight:1}}>{fN(v)}</p>
+                        <p style={{fontSize:9,color:'rgba(255,255,255,.5)',
+                          margin:'2px 0 0'}}>{l}</p>
+                      </div>
+                    ))}
+                    <div style={{textAlign:'center',borderLeft:'1px solid rgba(255,255,255,.15)',
+                      paddingLeft:20}}>
+                      <p style={{fontFamily:F,fontSize:24,fontWeight:900,
+                        color:A,margin:0,lineHeight:1}}>{fN(total)}</p>
+                      <p style={{fontSize:9,color:'rgba(255,255,255,.5)',margin:'2px 0 0'}}>Total</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+          ) : (
+
+            /* ─── VISTA CLIENTES ──────────────────────────────────────── */
+            <div>
+              {/* Filtro por proyecto */}
+              {porProy.length>1&&(
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+                  <select value={proyFiltro} onChange={e=>setPF(e.target.value)}
+                    style={{padding:'6px 11px',borderRadius:8,
+                      border:'1px solid rgba(18,81,96,.18)',
+                      background:'white',color:T,fontSize:12,fontFamily:F,
+                      outline:'none',flex:1,maxWidth:320}}>
+                    <option value="">Todos los proyectos ({total})</option>
+                    {porProy.map((p:any)=>(
+                      <option key={p.proyecto} value={p.proyecto}>
+                        {p.proyecto} ({p.total})
+                      </option>
+                    ))}
+                  </select>
+                  {proyFiltro&&(
+                    <button onClick={()=>exportVentana(proyFiltro)}
+                      style={{display:'flex',alignItems:'center',gap:5,padding:'6px 12px',
+                        borderRadius:8,border:'1px solid rgba(18,81,96,.2)',cursor:'pointer',
+                        background:A,color:T,fontSize:11,fontWeight:700,fontFamily:F}}>
+                      ↓ Excel este proyecto
+                    </button>
+                  )}
+                  <span style={{fontSize:11,color:'rgba(18,81,96,.45)'}}>
+                    {clientesFiltrados.length} clientes
+                  </span>
+                </div>
+              )}
+
+              {/* Lista de clientes */}
+              <div style={{display:'flex',flexDirection:'column',gap:7}}>
+                {clientesFiltrados.length===0 ? (
+                  <div style={{textAlign:'center',padding:'32px 0',
+                    color:'rgba(18,81,96,.35)',fontSize:13}}>
+                    Sin clientes en ventana de cierre
+                  </div>
+                ) : clientesFiltrados.map((c:any)=>{
+                  const col=STAGE_COL[c.etapa_codigo]||T
+                  return (
+                    <div key={c.hs_object_id}
+                      onClick={()=>onSelectRow(c)}
+                      style={{
+                        background:'white',borderRadius:10,padding:'10px 14px',
+                        border:'1px solid rgba(18,81,96,.07)',
+                        borderLeft:`3px solid ${col}`,
+                        cursor:'pointer',transition:'box-shadow .15s',
+                        display:'grid',
+                        gridTemplateColumns:'1fr 1fr auto',
+                        gap:'8px 16px',alignItems:'center',
+                      }}>
+                      {/* Columna 1: Comprador + proyecto */}
+                      <div>
+                        <p style={{fontWeight:700,fontSize:12,color:T,
+                          margin:0,marginBottom:2}}>
+                          {c.nombrecomprador||'Sin nombre'}
+                        </p>
+                        <p style={{fontSize:10,color:'rgba(18,81,96,.5)',margin:0}}>
+                          {c.documento_comprador_1&&`CC ${c.documento_comprador_1} · `}
+                          {c.proyecto}
+                        </p>
+                      </div>
+                      {/* Columna 2: Stage + día */}
+                      <div>
+                        <div style={{display:'flex',alignItems:'center',gap:6}}>
+                          <span style={{background:`${col}15`,color:col,padding:'1px 7px',
+                            borderRadius:99,fontSize:10,fontWeight:700,
+                            border:`1px solid ${col}28`}}>
+                            {STAGE_LBL[c.etapa_codigo]||c.etapa_codigo}
+                          </span>
+                        </div>
+                        <p style={{fontSize:10,color:'rgba(18,81,96,.5)',margin:'3px 0 0'}}>
+                          Día {c.dia_aprobacion} · {dtF(c.fecha_aprobacion_final)}
+                          {c.canal_atribucion&&` · ${c.canal_atribucion}`}
+                        </p>
+                      </div>
+                      {/* Columna 3: Valor + link */}
+                      <div style={{textAlign:'right'}}>
+                        <p style={{fontSize:13,fontWeight:900,color:T,margin:'0 0 4px'}}>
+                          {fM(c.valor_del_inmueble)}
+                        </p>
+                        {c.hubspot_url&&(
+                          <a href={c.hubspot_url} target="_blank" rel="noopener noreferrer"
+                            onClick={e=>e.stopPropagation()}
+                            style={{display:'inline-flex',alignItems:'center',gap:4,
+                              fontSize:10,fontWeight:700,color:T,textDecoration:'none',
+                              background:A,padding:'2px 8px',borderRadius:6}}>
+                            HubSpot →
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Footer ──────────────────────────────────────────────────── */}
+        <div style={{padding:'10px 18px',borderTop:'1px solid rgba(18,81,96,.08)',
+          background:'white',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{fontSize:10,color:'rgba(18,81,96,.45)'}}>
+            Clic en un cliente para ver el detalle completo
+          </span>
+          <button onClick={()=>exportVentana()}
+            disabled={loading||!total}
+            style={{display:'flex',alignItems:'center',gap:5,padding:'5px 12px',
+              borderRadius:8,border:`1px solid rgba(18,81,96,.2)`,cursor:'pointer',
+              background:A,color:T,fontSize:11,fontWeight:700,fontFamily:F,
+              opacity:loading||!total?.5:1}}>
+            ↓ Descargar {total} clientes (.xlsx)
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════════════
    RECHAZADOS DRAWER — listado completo de rechazados y caídas
 ════════════════════════════════════════════════════════════════════ */
 function RechazadosDrawer({rows,onClose,onSelectRow,onExport}:{
@@ -780,6 +1162,10 @@ export default function Dashboard() {
   const [kanbanStage, setKanbanStage] =useState<string|null>(null)
   // Drawer de rechazados — listado filtrado
   const [showRechazados, setShowRechazados]=useState(false)
+  // Ventana de cierre drawer
+  const [showVentana,    setShowVentana]   =useState(false)
+  const [ventanaData,    setVentanaData]   =useState<any>(null)
+  const [ventanaLoading, setVentanaLoading]=useState(false)
   // Drill-down de motivo de observación
   const [motivoSeleccionado, setMotivoSel]=useState<string|null>(null)
   const [motivoDet, setMotivoDet]         =useState<any[]>([])
@@ -841,6 +1227,16 @@ export default function Dashboard() {
         setMo(arr)
       } catch { setMo([]) }
     }finally{setLoading(false)}
+  },[qs])
+
+  // Cargar desglose de ventana de cierre
+  const fetchVentana = useCallback(async()=>{
+    setVentanaLoading(true)
+    setShowVentana(true)
+    try{
+      const data = await fetch(`/api/ventana?${qs()}`).then(r=>r.json())
+      setVentanaData(data)
+    }finally{setVentanaLoading(false)}
   },[qs])
 
   // Cargar detalle de legalizaciones para un motivo específico
@@ -937,6 +1333,17 @@ export default function Dashboard() {
       {selected&&<DetailDrawer row={selected} onClose={()=>setSelected(null)}/>}
 
       {/* ══ DRAWER: RECHAZADOS Y CAÍDAS ═══════════════════════════════ */}
+      {showVentana&&(
+        <VentanaDrawer
+          data={ventanaData}
+          loading={ventanaLoading}
+          onClose={()=>{setShowVentana(false)}}
+          onSelectRow={(r:any)=>{setSelected(r)}}
+          anio={anio}
+          mes={mes}
+        />
+      )}
+
       {showRechazados&&det&&(
         <RechazadosDrawer
           rows={(det.rows||[]).filter((r:any)=>r.etapa_codigo==='negocio_rechazado'||r.etapa_codigo==='venta_caida')}
@@ -1166,12 +1573,26 @@ export default function Dashboard() {
                   </p>
                 </div>
               </div>
-              {kpis?.ultima_actualizacion&&(
-                <span style={{fontSize:10,color:'rgba(18,81,96,.4)'}}>
-                  Actualizado {new Date(kpis.ultima_actualizacion).toLocaleString('es-CO',
-                    {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
-                </span>
-              )}
+              <div style={{display:'flex',alignItems:'center',gap:10}}>
+                {kpis?.en_ventana_cierre>0&&(
+                  <button onClick={()=>fetchVentana()} style={{
+                    display:'flex',alignItems:'center',gap:6,
+                    padding:'5px 12px',borderRadius:8,cursor:'pointer',
+                    background:'rgba(161,216,26,.12)',fontFamily:`'Funnel Sans',Arial,sans-serif`,
+                    border:'1px solid rgba(161,216,26,.35)',color:'#4d7c0f',
+                    fontSize:11,fontWeight:700,transition:'all .15s',
+                  }}>
+                    <span style={{fontSize:14}}>📋</span>
+                    Ver {kpis.en_ventana_cierre} en ventana
+                  </button>
+                )}
+                {kpis?.ultima_actualizacion&&(
+                  <span style={{fontSize:10,color:'rgba(18,81,96,.4)'}}>
+                    Actualizado {new Date(kpis.ultima_actualizacion).toLocaleString('es-CO',
+                      {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+                  </span>
+                )}
+              </div>
             </div>
 
             {!kpis ? <Sk h={190}/> : (()=>{
@@ -1253,15 +1674,17 @@ export default function Dashboard() {
                     <KpiCard card={{
                       l:'Ventas caídas', v:kpis.ventas_caidas, border:kpis.ventas_caidas>0?'#991B1B':T,
                     }}/>
-                    {/* Card 7: Ventana de cierre */}
-                    <KpiCard card={{
-                      l:'Ventana de cierre',
-                      v:`${kpis.pct_ventana_cierre}%`,
-                      border:kpis.pct_ventana_cierre>40?'#92400E':AM,
-                      sub:`${kpis.en_ventana_cierre} aprobadas después del día 25`,
-                      tip:'% de aprobaciones en los últimos días del mes (día 25+). Un % alto indica que el equipo cierra al final del mes.',
-                      prog:kpis.pct_ventana_cierre,
-                    }}/>
+                    {/* Card 7: Ventana de cierre — clickeable */}
+                    <div onClick={()=>fetchVentana()} style={{cursor:'pointer'}} title="Clic para ver el desglose">
+                      <KpiCard card={{
+                        l:'Ventana de cierre ↗',
+                        v:`${kpis.pct_ventana_cierre}%`,
+                        border:kpis.pct_ventana_cierre>40?'#92400E':AM,
+                        sub:`${kpis.en_ventana_cierre} clientes · clic para desglose`,
+                        tip:'% de aprobaciones en los últimos días del mes (día 25+). Clic para ver qué proyectos y qué clientes están en ventana.',
+                        prog:kpis.pct_ventana_cierre,
+                      }}/>
+                    </div>
                     {/* Celda vacía en col 4 para mantener el grid equilibrado */}
                     <div/>
                   </div>
