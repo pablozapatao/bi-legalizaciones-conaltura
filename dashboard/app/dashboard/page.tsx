@@ -518,7 +518,7 @@ function VentanaDrawer({data,loading,onClose,onSelectRow,anio,mes}:{
     XLSX.writeFile(wb,fname)
   }
 
-  const MESF=['''Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+  const MESF=['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
   return (
     <>
