@@ -66,30 +66,57 @@ export async function GET(req: NextRequest) {
         nombre_legalizacion,
         etapa_codigo,
         grupo,
-        proyecto_limpio                    AS proyecto,
+        proyecto_limpio                            AS proyecto,
         director,
         ciudad,
         torre,
+        -- Canales
         canal_atribucion,
         canal_gestion_original,
+        canal_gestion_secundario,
+        -- Comprador
         nombrecomprador,
         documento_comprador_1,
+        documento_comprador_2,
+        -- Valores
         valor_del_inmueble,
+        tipo_de_cuenta_de_consignacion_de_separacion,
+        -- Fechas
         fecha_aprobacion_final,
-        dias_consignacion_a_aprobacion     AS dias_lead_time,
+        fecha_envio_sarlaft,
+        fecha_respuesta_sarlaft,
+        -- Tiempos
+        dias_consignacion_a_aprobacion             AS dias_lead_time,
+        dias_en_consignacion,
+        dias_en_legal_espera,
+        dias_en_legal_aprobada_dir,
+        dias_en_revision_sinco,
         aging_dias,
         en_ventana_cierre,
+        -- Estados
         motivo_de_observacion,
         verificacion_documental_sinco,
         estado_sarlaft,
         decision_final_legalizacion,
+        -- Unidad
         invdescunidad,
         numero_unidad,
+        -- Responsables
+        propietario_del_negocio,
+        id_negocio_comercial_origen,
+        deal_id,
+        -- Trazabilidad
         hubspot_url,
         hs_createdate,
+        hs_lastmodifieddate,
+        -- Fechas de stage
         date_entered_consignacion,
+        date_entered_legal_espera,
+        date_entered_legal_aprobada_dir,
+        date_entered_revision_sinco,
         date_entered_aprobado_exitoso,
         date_entered_aprobado_novedades,
+        date_entered_negocio_rechazado,
         date_entered_venta_caida
       FROM raw_legalizaciones
       WHERE ${where}
@@ -132,8 +159,37 @@ export async function GET(req: NextRequest) {
         invdescunidad:             r.invdescunidad ?? '',
         numero_unidad:             r.numero_unidad ?? '',
         hubspot_url:               r.hubspot_url ?? '',
+        // Campos nuevos
+        canal_gestion_secundario:  r.canal_gestion_secundario ?? '',
+        documento_comprador_2:     r.documento_comprador_2    ?? '',
+        tipo_cuenta_consignacion:  r.tipo_de_cuenta_de_consignacion_de_separacion ?? '',
+        propietario_del_negocio:   r.propietario_del_negocio  ?? '',
+        id_negocio_origen:         r.id_negocio_comercial_origen != null ? Number(r.id_negocio_comercial_origen) : null,
+        deal_id:                   r.deal_id != null ? Number(r.deal_id) : null,
+        // Fechas SARLAFT
+        fecha_envio_sarlaft:       r.fecha_envio_sarlaft
+          ? new Date(r.fecha_envio_sarlaft).toISOString().slice(0,10) : null,
+        fecha_respuesta_sarlaft:   r.fecha_respuesta_sarlaft
+          ? new Date(r.fecha_respuesta_sarlaft).toISOString().slice(0,10) : null,
+        // Tiempos por stage (días)
+        dias_en_consignacion:      r.dias_en_consignacion      != null ? parseFloat(r.dias_en_consignacion)      : null,
+        dias_en_legal_espera:      r.dias_en_legal_espera      != null ? parseFloat(r.dias_en_legal_espera)      : null,
+        dias_en_legal_aprobada:    r.dias_en_legal_aprobada_dir != null ? parseFloat(r.dias_en_legal_aprobada_dir) : null,
+        dias_en_revision_sinco:    r.dias_en_revision_sinco    != null ? parseFloat(r.dias_en_revision_sinco)    : null,
+        // Fechas de creación y modificación
         fecha_creacion:            r.hs_createdate
           ? new Date(r.hs_createdate).toISOString().slice(0,10) : null,
+        fecha_modificacion:        r.hs_lastmodifieddate
+          ? new Date(r.hs_lastmodifieddate).toISOString().slice(0,10) : null,
+        // Fechas de entrada a cada stage
+        date_entered_consignacion:       r.date_entered_consignacion       ? new Date(r.date_entered_consignacion).toISOString().slice(0,10)       : null,
+        date_entered_legal_espera:       r.date_entered_legal_espera       ? new Date(r.date_entered_legal_espera).toISOString().slice(0,10)       : null,
+        date_entered_legal_aprobada_dir: r.date_entered_legal_aprobada_dir ? new Date(r.date_entered_legal_aprobada_dir).toISOString().slice(0,10) : null,
+        date_entered_revision_sinco:     r.date_entered_revision_sinco     ? new Date(r.date_entered_revision_sinco).toISOString().slice(0,10)     : null,
+        date_entered_aprobado_exitoso:   r.date_entered_aprobado_exitoso   ? new Date(r.date_entered_aprobado_exitoso).toISOString().slice(0,10)   : null,
+        date_entered_aprobado_novedades: r.date_entered_aprobado_novedades ? new Date(r.date_entered_aprobado_novedades).toISOString().slice(0,10) : null,
+        date_entered_negocio_rechazado:  r.date_entered_negocio_rechazado  ? new Date(r.date_entered_negocio_rechazado).toISOString().slice(0,10)  : null,
+        date_entered_venta_caida:        r.date_entered_venta_caida        ? new Date(r.date_entered_venta_caida).toISOString().slice(0,10)        : null,
       })),
       total,
       pagina,
