@@ -317,10 +317,32 @@ function DetailDrawer({row,onClose}:{row:any;onClose:()=>void}) {
    EXCEL EXPORT — SheetJS, formato .xlsx nativo
 ════════════════════════════════════════════════════════════════════ */
 /* ════════════════════════════════════════════════════════════════════
-   EXCEL EXPORTS — múltiples formatos
+   EXCEL EXPORTS — siempre buscan TODOS los registros, sin paginación
+   fetchAllRows(qs, grupo?) pagina automáticamente hasta traerlos todos
 ════════════════════════════════════════════════════════════════════ */
 
-// Exportar tabla de proyectos (resumen)
+// Descarga todos los registros del endpoint /api/detalle sin límite de paginación
+async function fetchAllRows(qs: string, grupo?: string): Promise<any[]> {
+  const POR_PAG = 2000
+  let pagina = 1
+  const todos: any[] = []
+  while (true) {
+    const p = new URLSearchParams(qs)
+    p.set('pagina', String(pagina))
+    p.set('por_pagina', String(POR_PAG))
+    if (grupo && grupo !== 'todos') p.set('grupo', grupo)
+    const data = await fetch(`/api/detalle?${p.toString()}`).then(r => r.json())
+    const rows: any[] = data.rows || []
+    todos.push(...rows)
+    if (todos.length >= (data.total ?? 0) || rows.length < POR_PAG) break
+    pagina++
+    // Seguro ante bucles infinitos
+    if (pagina > 50) break
+  }
+  return todos
+}
+
+// Exportar tabla de proyectos (resumen agregado — ya viene completo del API)
 async function exportXLSX(rows:any[]) {
   const XLSX = await import('xlsx')
   const data = rows.map((r:any)=>({
@@ -344,7 +366,7 @@ async function exportXLSX(rows:any[]) {
   toast.success('✅ Conaltura_BI_Proyectos.xlsx')
 }
 
-// Exportar clientes legalizados — toda la información disponible
+// Exportar clientes — 23 columnas con toda la info
 async function exportClientesXLSX(rows:any[], nombreArchivo='Conaltura_Clientes_Legalizados.xlsx') {
   const XLSX = await import('xlsx')
   const data = rows.map((r:any)=>({
@@ -377,10 +399,10 @@ async function exportClientesXLSX(rows:any[], nombreArchivo='Conaltura_Clientes_
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb,ws,'Clientes Legalizados')
   XLSX.writeFile(wb,nombreArchivo)
-  toast.success(`✅ ${nombreArchivo}`)
+  toast.success(`✅ ${nombreArchivo} — ${rows.length} registros`)
 }
 
-// Exportar rechazados — listado detallado para gestión
+// Exportar rechazados + caídas
 async function exportRechazadosXLSX(rows:any[]) {
   const XLSX = await import('xlsx')
   const rechazados = rows.filter((r:any)=>
@@ -407,7 +429,7 @@ async function exportRechazadosXLSX(rows:any[]) {
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb,ws,'Rechazados y Caídas')
   XLSX.writeFile(wb,'Conaltura_Rechazados.xlsx')
-  toast.success('✅ Conaltura_Rechazados.xlsx')
+  toast.success(`✅ Conaltura_Rechazados.xlsx — ${rechazados.length} registros`)
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -1207,19 +1229,18 @@ export default function Dashboard() {
       setK(k);setP(p);setT(t);setTi(ti);setPr(pr);setCa(ca)
       // Extraer lista de proyectos para el filtro
       if(pr?.proyectos) setAllProy(pr.proyectos.map((x:any)=>x.proyecto).filter(Boolean).sort())
-      // Cargar motivos de observación desde detalle (todos, sin paginación limitada)
+      // Cargar motivos de observación — todos los registros del mes sin límite
       try {
-        const detAll = await fetch(`/api/detalle?${q}&pagina=1&por_pagina=200`).then(r=>r.json())
+        const allRows = await fetchAllRows(q)
         // Agregar por director + motivo
         const map: Record<string,Record<string,number>> = {}
-        for (const row of (detAll.rows||[])) {
+        for (const row of allRows) {
           if (!row.motivo_de_observacion || row.motivo_de_observacion.trim()==='') continue
           const dir = (row.director||'Sin director').split(' ')[0]+' '+((row.director||'').split(' ').slice(-1)[0]||'')
           const mot = row.motivo_de_observacion.trim().substring(0,60)
           if (!map[mot]) map[mot]={}
           map[mot][dir]=(map[mot][dir]||0)+1
         }
-        // Convertir a array para el gráfico, top 8 motivos
         const arr = Object.entries(map)
           .map(([motivo,dirs])=>({motivo, total:Object.values(dirs).reduce((s,n)=>s+n,0), dirs}))
           .sort((a,b)=>b.total-a.total)
@@ -1244,12 +1265,10 @@ export default function Dashboard() {
     setMotivoLoading(true)
     setMotivoSel(motivo)
     try{
-      const q=qs()
-      const p=new URLSearchParams(q)
-      p.set('pagina','1'); p.set('por_pagina','200')
-      const data = await fetch(`/api/detalle?${p.toString()}`).then(r=>r.json())
+      // Traemos todos los registros del mes (sin límite de 200)
+      const todos = await fetchAllRows(qs())
       // Filtrar client-side por motivo exacto
-      const filtradas = (data.rows||[]).filter((r:any)=>
+      const filtradas = todos.filter((r:any)=>
         (r.motivo_de_observacion||'').trim().substring(0,60) === motivo.trim().substring(0,60)
       )
       setMotivoDet(filtradas)
@@ -1349,7 +1368,14 @@ export default function Dashboard() {
           rows={(det.rows||[]).filter((r:any)=>r.etapa_codigo==='negocio_rechazado'||r.etapa_codigo==='venta_caida')}
           onClose={()=>setShowRechazados(false)}
           onSelectRow={(r:any)=>{setSelected(r);setShowRechazados(false)}}
-          onExport={()=>exportRechazadosXLSX(det.rows||[])}
+          onExport={async()=>{
+            const tid=toast.loading('Preparando descarga rechazados…')
+            try{
+              const todos=await fetchAllRows(qs(),'todos')
+              toast.dismiss(tid)
+              await exportRechazadosXLSX(todos)
+            }catch{toast.dismiss(tid);toast.error('Error al descargar')}
+          }}
         />
       )}
 
@@ -1361,7 +1387,11 @@ export default function Dashboard() {
           loading={motivoLoading}
           onClose={()=>{setMotivoSel(null);setMotivoDet([])}}
           onSelectRow={(r:any)=>{setSelected(r);setMotivoSel(null);setMotivoDet([])}}
-          onExport={()=>exportClientesXLSX(motivoDet,`Conaltura_Motivo_${motivoSeleccionado.slice(0,20).replace(/\s+/g,'_')}.xlsx`)}
+          onExport={async()=>{
+            // motivoDet ya contiene todos los de ese motivo (se buscan 2000 en fetchMotivoDet)
+            const fname=`Conaltura_Motivo_${motivoSeleccionado.slice(0,20).replace(/\s+/g,'_')}.xlsx`
+            await exportClientesXLSX(motivoDet,fname)
+          }}
         />
       )}
       {showMeta&&kpis&&(
@@ -1912,14 +1942,20 @@ export default function Dashboard() {
                   Proyectos
                 </button>
 
-                {/* Excel clientes completo */}
-                <button onClick={()=>det?.rows?.length&&exportClientesXLSX(det.rows)}
-                  disabled={!det?.rows?.length}
+                {/* Excel clientes completo — busca TODOS los registros del mes */}
+                <button
+                  onClick={async()=>{
+                    const tid=toast.loading('Preparando descarga…')
+                    try{
+                      const todos=await fetchAllRows(qs(),'resolucion')
+                      toast.dismiss(tid)
+                      await exportClientesXLSX(todos)
+                    }catch{toast.dismiss(tid);toast.error('Error al descargar')}
+                  }}
                   title="Todos los clientes con información completa (.xlsx)"
                   style={{display:'flex',alignItems:'center',gap:5,padding:'5px 11px',
                     borderRadius:8,border:`1px solid ${AM}55`,cursor:'pointer',
-                    background:`${AM}18`,color:'#166534',fontSize:11,fontWeight:700,fontFamily:F,
-                    opacity:det?.rows?.length?1:.45}}>
+                    background:`${AM}18`,color:'#166534',fontSize:11,fontWeight:700,fontFamily:F}}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                     <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M8 12l4 4 4-4M12 4v12"
                       stroke="#166534" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
