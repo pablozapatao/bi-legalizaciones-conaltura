@@ -415,78 +415,98 @@ async function exportXLSX(rows:any[]) {
   toast.success('✅ Conaltura_BI_Proyectos.xlsx')
 }
 
-// Exportar clientes — TODOS los campos disponibles en la base de datos
+// Exportar clientes — TODOS los campos disponibles · 46 columnas
+// Canal Gestión PRIMARIO  = canal_gestion_original   (canal_de_gestion_comercial_original_negocio)
+// Canal Gestión SECUNDARIO= canal_gestion_secundario (canal_de_gestion_comercial_secundario_negocio)
 async function exportClientesXLSX(rows:any[], nombreArchivo='Conaltura_Clientes_Legalizados.xlsx') {
+  if (!rows.length) { toast.error('Sin registros para descargar'); return }
   const XLSX = await import('xlsx')
+
+  // Debug: log en consola para verificar que los canales llegan
+  const conCanal2 = rows.filter(r=>r.canal_gestion_secundario&&r.canal_gestion_secundario!=='').length
+  console.log(`[Export] ${rows.length} registros · ${conCanal2} con canal gestión secundario`)
+
   const data = rows.map((r:any)=>({
-    // Identificación
-    'ID HubSpot':                   r.hs_object_id||'',
-    'Nombre Legalización':          r.nombre_legalizacion||'',
-    'ID Deal HubSpot':              r.deal_id||'',
-    'ID Negocio Origen':            r.id_negocio_origen||'',
-    // Proyecto y ubicación
-    'Proyecto':                     r.proyecto||'',
-    'Director':                     r.director||'',
-    'Ciudad':                       r.ciudad||'',
-    'Torre':                        r.torre||'',
-    'Número Unidad':                r.numero_unidad||'',
-    'Descripción Unidad':           r.invdescunidad||'',
-    // Comprador
-    'Comprador':                    r.nombrecomprador||'',
-    'Documento Comprador 1':        r.documento_comprador_1||'',
-    'Documento Comprador 2':        r.documento_comprador_2||'',
-    // Canales
-    'Canal Atribución':             r.canal_atribucion||'',
-    'Canal Gestión Principal':      r.canal_gestion_original||'',
-    'Canal Gestión Secundario':     r.canal_gestion_secundario||'',
-    'Tipo Cuenta Consignación':     r.tipo_cuenta_consignacion||'',
-    // Stage y estados
-    'Stage':                        r.etapa_label||r.etapa_codigo||'',
-    'SARLAFT':                      r.estado_sarlaft||'',
-    'Verificación Documental':      r.verificacion_documental||'',
-    'Decisión Final':               r.decision_final||'',
-    'Motivo Observación':           r.motivo_de_observacion||'',
-    'Semáforo':                     r.motivo_semaforo||'',
-    // Valor
-    'Valor Inmueble COP':           r.valor_del_inmueble||'',
-    // Responsable
-    'Propietario del Negocio':      r.propietario_del_negocio||'',
-    // Fechas clave
-    'Fecha Creación':               r.fecha_creacion||'',
-    'Fecha Modificación':           r.fecha_modificacion||'',
-    'Fecha Aprobación':             r.fecha_aprobacion_final||'',
-    'Fecha Envío SARLAFT':          r.fecha_envio_sarlaft||'',
-    'Fecha Respuesta SARLAFT':      r.fecha_respuesta_sarlaft||'',
-    // En ventana
-    'En Ventana Cierre':            r.en_ventana_cierre ? 'Sí' : 'No',
-    // Tiempos totales
-    'Lead Time Total (días)':       r.dias_lead_time||'',
-    'Antigüedad en Stage (días)':   r.aging_dias||'',
-    // Tiempos por stage
-    'Días en Consignación':         r.dias_en_consignacion||'',
-    'Días en Espera Director':      r.dias_en_legal_espera||'',
-    'Días en Aprobada Director':    r.dias_en_legal_aprobada||'',
-    'Días en Revisión SINCO':       r.dias_en_revision_sinco||'',
-    // Fechas de entrada a cada stage
-    'Entrada Consignación':         r.date_entered_consignacion||'',
-    'Entrada Espera Director':      r.date_entered_legal_espera||'',
-    'Entrada Aprobada Director':    r.date_entered_legal_aprobada_dir||'',
-    'Entrada Revisión SINCO':       r.date_entered_revision_sinco||'',
-    'Entrada Aprobado Exitoso':     r.date_entered_aprobado_exitoso||'',
-    'Entrada Aprobado Novedades':   r.date_entered_aprobado_novedades||'',
-    'Entrada Rechazado':            r.date_entered_negocio_rechazado||'',
-    'Entrada Venta Caída':          r.date_entered_venta_caida||'',
-    // Trazabilidad
-    'URL HubSpot':                  r.hubspot_url||'',
+    // ── IDENTIFICACIÓN ──────────────────────────────────────────────────────
+    'ID HubSpot':                      r.hs_object_id             || '',
+    'Nombre Legalización':             r.nombre_legalizacion      || '',
+    'ID Deal HubSpot':                 r.deal_id                  || '',
+    'ID Negocio Comercial Origen':     r.id_negocio_origen        || '',
+    // ── PROYECTO Y UBICACIÓN ────────────────────────────────────────────────
+    'Proyecto':                        r.proyecto                 || '',
+    'Director':                        r.director                 || '',
+    'Ciudad':                          r.ciudad                   || '',
+    'Torre':                           r.torre                    || '',
+    'Número Unidad':                   r.numero_unidad            || '',
+    'Descripción Unidad':              r.invdescunidad            || '',
+    // ── COMPRADOR ───────────────────────────────────────────────────────────
+    'Comprador':                       r.nombrecomprador          || '',
+    'Documento Comprador 1':           r.documento_comprador_1    || '',
+    'Documento Comprador 2':           r.documento_comprador_2    || '',
+    'Propietario del Negocio':         r.propietario_del_negocio  || '',
+    // ── CANALES (los 3 disponibles) ─────────────────────────────────────────
+    'Canal de Atribución':             r.canal_atribucion         || '',
+    'Canal Gestión PRIMARIO':          r.canal_gestion_original   || '',
+    'Canal Gestión SECUNDARIO':        r.canal_gestion_secundario || '',
+    'Tipo Cuenta Consignación':        r.tipo_cuenta_consignacion || '',
+    // ── STAGE Y RESOLUCIÓN ──────────────────────────────────────────────────
+    'Stage':                           r.etapa_label              || r.etapa_codigo || '',
+    'Decisión Final':                  r.decision_final           || '',
+    'Motivo de Observación':           r.motivo_de_observacion    || '',
+    'Semáforo Observación':            r.motivo_semaforo          || '',
+    // ── SARLAFT ─────────────────────────────────────────────────────────────
+    'Estado SARLAFT':                  r.estado_sarlaft           || '',
+    'Verificación Documental':         r.verificacion_documental  || '',
+    'Fecha Envío SARLAFT':             r.fecha_envio_sarlaft      || '',
+    'Fecha Respuesta SARLAFT':         r.fecha_respuesta_sarlaft  || '',
+    // ── VALOR ───────────────────────────────────────────────────────────────
+    'Valor Inmueble COP':              r.valor_del_inmueble       || '',
+    // ── VENTANA DE CIERRE ───────────────────────────────────────────────────
+    'En Ventana Cierre (día 25+)':     r.en_ventana_cierre ? 'Sí' : 'No',
+    // ── FECHAS CLAVE ────────────────────────────────────────────────────────
+    'Fecha Creación':                  r.fecha_creacion           || '',
+    'Fecha Última Modificación':       r.fecha_modificacion       || '',
+    'Fecha Aprobación':                r.fecha_aprobacion_final   || '',
+    // ── TIEMPOS DE PROCESO ──────────────────────────────────────────────────
+    'Lead Time Total (días)':          r.dias_lead_time           != null ? r.dias_lead_time : '',
+    'Antigüedad en Stage (días)':      r.aging_dias               != null ? r.aging_dias     : '',
+    'Días en Consignación':            r.dias_en_consignacion     != null ? r.dias_en_consignacion     : '',
+    'Días en Espera Director':         r.dias_en_legal_espera     != null ? r.dias_en_legal_espera     : '',
+    'Días en Aprobada Director':       r.dias_en_legal_aprobada   != null ? r.dias_en_legal_aprobada   : '',
+    'Días en Revisión SINCO':          r.dias_en_revision_sinco   != null ? r.dias_en_revision_sinco   : '',
+    // ── FECHAS DE ENTRADA A CADA STAGE ──────────────────────────────────────
+    'Fecha Entrada Consignación':      r.date_entered_consignacion        || '',
+    'Fecha Entrada Espera Director':   r.date_entered_legal_espera        || '',
+    'Fecha Entrada Aprobada Director': r.date_entered_legal_aprobada_dir  || '',
+    'Fecha Entrada Revisión SINCO':    r.date_entered_revision_sinco      || '',
+    'Fecha Entrada Aprobado Exitoso':  r.date_entered_aprobado_exitoso    || '',
+    'Fecha Entrada Con Novedades':     r.date_entered_aprobado_novedades  || '',
+    'Fecha Entrada Rechazado':         r.date_entered_negocio_rechazado   || '',
+    'Fecha Entrada Venta Caída':       r.date_entered_venta_caida         || '',
+    // ── TRAZABILIDAD ────────────────────────────────────────────────────────
+    'URL HubSpot':                     r.hubspot_url              || '',
   }))
+
   const ws = XLSX.utils.json_to_sheet(data)
-  // Anchos de columna
-  const cols = [14,32,14,16,24,22,14,10,12,24,28,18,18,18,22,22,22,12,16,24,20,40,10,18,24,16,16,16,16,16,10,14,14,16,14,14,14,16,16,16,16,16,16,16,40]
-  ws['!cols'] = cols.map(w=>({wch:w}))
+  ws['!cols'] = [
+    14,32,14,18, // ID
+    24,20,14,8,12,22, // proyecto
+    28,18,18,24, // comprador
+    22,26,26,22, // canales
+    18,18,40,10, // stage
+    16,24,16,16, // sarlaft
+    18,          // valor
+    16,          // ventana
+    16,16,16,    // fechas clave
+    14,14,14,14,14,14, // tiempos
+    18,18,18,18,18,18,18,18, // fechas stage
+    40,          // url
+  ].map(w=>({wch:w}))
+
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb,ws,'Clientes Legalizados')
-  XLSX.writeFile(wb,nombreArchivo)
-  toast.success(`✅ ${nombreArchivo} — ${rows.length} registros · ${data[0] ? Object.keys(data[0]).length : 0} columnas`)
+  XLSX.utils.book_append_sheet(wb, ws, 'Clientes Legalizados')
+  XLSX.writeFile(wb, nombreArchivo)
+  toast.success(`✅ ${nombreArchivo} — ${rows.length} registros · ${Object.keys(data[0]||{}).length} columnas`)
 }
 
 // Exportar rechazados + caídas
