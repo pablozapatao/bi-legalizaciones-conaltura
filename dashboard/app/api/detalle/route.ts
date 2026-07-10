@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     const f          = parseFiltros(params)
     const grupo      = params.get('grupo') ?? null
     const pagina     = Math.max(1, Number(params.get('pagina')    ?? 1))
-    const por_pagina = Math.min(200, Number(params.get('por_pagina') ?? 50))
+    const por_pagina = Math.min(5000, Number(params.get('por_pagina') ?? 50))
     const offset     = (pagina - 1) * por_pagina
 
     const nowCOL = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }))
