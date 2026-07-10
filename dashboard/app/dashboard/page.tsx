@@ -257,7 +257,28 @@ function DetailDrawer({row,onClose}:{row:any;onClose:()=>void}) {
           <div style={{background:'white',borderRadius:10,padding:'12px 14px',border:`1px solid rgba(18,81,96,.07)`}}>
             <p style={{fontSize:9,textTransform:'uppercase',letterSpacing:'.08em',color:'rgba(18,81,96,.45)',marginBottom:7}}>👤 Comprador</p>
             <p style={{fontSize:13,fontWeight:700,color:T,marginBottom:2}}>{row.nombrecomprador||'—'}</p>
-            <p style={{fontSize:11,color:'rgba(18,81,96,.5)'}}>CC {row.documento_comprador_1||'—'}</p>
+            <div style={{display:'flex',gap:16}}>
+              {row.documento_comprador_1&&<p style={{fontSize:11,color:'rgba(18,81,96,.5)'}}>CC1: {row.documento_comprador_1}</p>}
+              {row.documento_comprador_2&&<p style={{fontSize:11,color:'rgba(18,81,96,.5)'}}>CC2: {row.documento_comprador_2}</p>}
+            </div>
+          </div>
+
+          {/* Canal */}
+          <div style={{background:'white',borderRadius:10,padding:'12px 14px',border:`1px solid rgba(18,81,96,.07)`}}>
+            <p style={{fontSize:9,textTransform:'uppercase',letterSpacing:'.08em',color:'rgba(18,81,96,.45)',marginBottom:7}}>📡 Canal</p>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              {[
+                ['Atribución',           row.canal_atribucion],
+                ['Gestión (principal)',   row.canal_gestion_original],
+                ['Gestión (secundario)', row.canal_gestion_secundario],
+                ['Tipo cuenta consig.',  row.tipo_cuenta_consignacion],
+              ].filter(([,v])=>v).map(([l,v])=>(
+                <div key={l as string}>
+                  <p style={{fontSize:9,color:'rgba(18,81,96,.4)',marginBottom:1}}>{l}</p>
+                  <p style={{fontSize:12,fontWeight:600,color:T}}>{v}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Unidad */}
@@ -279,8 +300,16 @@ function DetailDrawer({row,onClose}:{row:any;onClose:()=>void}) {
           {/* Estados */}
           <div style={{background:'white',borderRadius:10,padding:'12px 14px',border:`1px solid rgba(18,81,96,.07)`}}>
             <p style={{fontSize:9,textTransform:'uppercase',letterSpacing:'.08em',color:'rgba(18,81,96,.45)',marginBottom:7}}>⚙️ Estados del proceso</p>
-            {[['SARLAFT',row.estado_sarlaft],['Verificación doc.',row.verificacion_documental],['Decisión final',row.decision_final],['Canal atribución',row.canal_atribucion],['Canal gestión',row.canal_gestion_original]]
-              .map(([l,v])=>(
+            {[
+              ['SARLAFT',              row.estado_sarlaft],
+              ['Verificación doc.',    row.verificacion_documental],
+              ['Decisión final',       row.decision_final],
+              ['Propietario',          row.propietario_del_negocio],
+              ['ID Negocio origen',    row.id_negocio_origen ? String(row.id_negocio_origen) : ''],
+              ['Deal HubSpot',         row.deal_id ? String(row.deal_id) : ''],
+              ['Envío SARLAFT',        row.fecha_envio_sarlaft],
+              ['Respuesta SARLAFT',    row.fecha_respuesta_sarlaft],
+            ].filter(([,v])=>v).map(([l,v])=>(
               <div key={l as string} style={{display:'flex',justifyContent:'space-between',alignItems:'center',
                 padding:'5px 0',borderBottom:'1px solid rgba(18,81,96,.05)'}}>
                 <span style={{fontSize:11,color:'rgba(18,81,96,.5)'}}>{l}</span>
@@ -289,10 +318,30 @@ function DetailDrawer({row,onClose}:{row:any;onClose:()=>void}) {
             ))}
           </div>
 
+          {/* Tiempos por stage */}
+          {(row.dias_en_consignacion||row.dias_en_legal_espera||row.dias_en_legal_aprobada||row.dias_en_revision_sinco)&&(
+            <div style={{background:'white',borderRadius:10,padding:'12px 14px',border:`1px solid rgba(18,81,96,.07)`}}>
+              <p style={{fontSize:9,textTransform:'uppercase',letterSpacing:'.08em',color:'rgba(18,81,96,.45)',marginBottom:8}}>⏱ Tiempo en cada etapa</p>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                {[
+                  ['Consignación →',    row.dias_en_consignacion],
+                  ['Espera Director →', row.dias_en_legal_espera],
+                  ['Aprobada Dir. →',   row.dias_en_legal_aprobada],
+                  ['Revisión SINCO →',  row.dias_en_revision_sinco],
+                ].filter(([,v])=>v!=null&&Number(v)>0).map(([l,v])=>(
+                  <div key={l as string} style={{background:'#F4F0E5',borderRadius:7,padding:'7px 10px'}}>
+                    <p style={{fontSize:9,color:'rgba(18,81,96,.45)',marginBottom:2}}>{l}</p>
+                    <p style={{fontSize:14,fontWeight:900,color:'#125160'}}>{Number(v).toFixed(1)} d</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Fechas */}
           <div style={{background:'white',borderRadius:10,padding:'12px 14px',border:`1px solid rgba(18,81,96,.07)`}}>
             <p style={{fontSize:9,textTransform:'uppercase',letterSpacing:'.08em',color:'rgba(18,81,96,.45)',marginBottom:7}}>📅 Fechas</p>
-            {[['Creación',row.fecha_creacion],['Aprobación',row.fecha_aprobacion_final]]
+            {[['Creación',row.fecha_creacion],['Modificación',row.fecha_modificacion],['Aprobación',row.fecha_aprobacion_final]]
               .map(([l,v])=>(
               <div key={l as string} style={{display:'flex',justifyContent:'space-between',padding:'4px 0'}}>
                 <span style={{fontSize:11,color:'rgba(18,81,96,.5)'}}>{l}</span>
@@ -366,40 +415,78 @@ async function exportXLSX(rows:any[]) {
   toast.success('✅ Conaltura_BI_Proyectos.xlsx')
 }
 
-// Exportar clientes — 23 columnas con toda la info
+// Exportar clientes — TODOS los campos disponibles en la base de datos
 async function exportClientesXLSX(rows:any[], nombreArchivo='Conaltura_Clientes_Legalizados.xlsx') {
   const XLSX = await import('xlsx')
   const data = rows.map((r:any)=>({
-    'ID HubSpot':               r.hs_object_id||'',
-    'Nombre Legalización':      r.nombre_legalizacion||'',
-    'Proyecto':                 r.proyecto||'',
-    'Director':                 r.director||'',
-    'Ciudad':                   r.ciudad||'',
-    'Torre':                    r.torre||'',
-    'Número Unidad':            r.numero_unidad||'',
-    'Descripción Unidad':       r.invdescunidad||'',
-    'Comprador':                r.nombrecomprador||'',
-    'Documento Comprador':      r.documento_comprador_1||'',
-    'Stage':                    r.etapa_label||r.etapa_codigo||'',
-    'Canal Atribución':         r.canal_atribucion||'',
-    'Canal Gestión':            r.canal_gestion_original||'',
-    'Valor Inmueble COP':       r.valor_del_inmueble||'',
-    'Fecha Aprobación':         r.fecha_aprobacion_final||'',
-    'Lead Time (días)':         r.dias_lead_time||'',
-    'Antigüedad (días)':        r.aging_dias||'',
-    'En Ventana Cierre':        r.en_ventana_cierre ? 'Sí' : 'No',
-    'Motivo Observación':       r.motivo_de_observacion||'',
-    'SARLAFT':                  r.estado_sarlaft||'',
-    'Verificación Documental':  r.verificacion_documental||'',
-    'Decisión Final':           r.decision_final||'',
-    'URL HubSpot':              r.hubspot_url||'',
+    // Identificación
+    'ID HubSpot':                   r.hs_object_id||'',
+    'Nombre Legalización':          r.nombre_legalizacion||'',
+    'ID Deal HubSpot':              r.deal_id||'',
+    'ID Negocio Origen':            r.id_negocio_origen||'',
+    // Proyecto y ubicación
+    'Proyecto':                     r.proyecto||'',
+    'Director':                     r.director||'',
+    'Ciudad':                       r.ciudad||'',
+    'Torre':                        r.torre||'',
+    'Número Unidad':                r.numero_unidad||'',
+    'Descripción Unidad':           r.invdescunidad||'',
+    // Comprador
+    'Comprador':                    r.nombrecomprador||'',
+    'Documento Comprador 1':        r.documento_comprador_1||'',
+    'Documento Comprador 2':        r.documento_comprador_2||'',
+    // Canales
+    'Canal Atribución':             r.canal_atribucion||'',
+    'Canal Gestión Principal':      r.canal_gestion_original||'',
+    'Canal Gestión Secundario':     r.canal_gestion_secundario||'',
+    'Tipo Cuenta Consignación':     r.tipo_cuenta_consignacion||'',
+    // Stage y estados
+    'Stage':                        r.etapa_label||r.etapa_codigo||'',
+    'SARLAFT':                      r.estado_sarlaft||'',
+    'Verificación Documental':      r.verificacion_documental||'',
+    'Decisión Final':               r.decision_final||'',
+    'Motivo Observación':           r.motivo_de_observacion||'',
+    'Semáforo':                     r.motivo_semaforo||'',
+    // Valor
+    'Valor Inmueble COP':           r.valor_del_inmueble||'',
+    // Responsable
+    'Propietario del Negocio':      r.propietario_del_negocio||'',
+    // Fechas clave
+    'Fecha Creación':               r.fecha_creacion||'',
+    'Fecha Modificación':           r.fecha_modificacion||'',
+    'Fecha Aprobación':             r.fecha_aprobacion_final||'',
+    'Fecha Envío SARLAFT':          r.fecha_envio_sarlaft||'',
+    'Fecha Respuesta SARLAFT':      r.fecha_respuesta_sarlaft||'',
+    // En ventana
+    'En Ventana Cierre':            r.en_ventana_cierre ? 'Sí' : 'No',
+    // Tiempos totales
+    'Lead Time Total (días)':       r.dias_lead_time||'',
+    'Antigüedad en Stage (días)':   r.aging_dias||'',
+    // Tiempos por stage
+    'Días en Consignación':         r.dias_en_consignacion||'',
+    'Días en Espera Director':      r.dias_en_legal_espera||'',
+    'Días en Aprobada Director':    r.dias_en_legal_aprobada||'',
+    'Días en Revisión SINCO':       r.dias_en_revision_sinco||'',
+    // Fechas de entrada a cada stage
+    'Entrada Consignación':         r.date_entered_consignacion||'',
+    'Entrada Espera Director':      r.date_entered_legal_espera||'',
+    'Entrada Aprobada Director':    r.date_entered_legal_aprobada_dir||'',
+    'Entrada Revisión SINCO':       r.date_entered_revision_sinco||'',
+    'Entrada Aprobado Exitoso':     r.date_entered_aprobado_exitoso||'',
+    'Entrada Aprobado Novedades':   r.date_entered_aprobado_novedades||'',
+    'Entrada Rechazado':            r.date_entered_negocio_rechazado||'',
+    'Entrada Venta Caída':          r.date_entered_venta_caida||'',
+    // Trazabilidad
+    'URL HubSpot':                  r.hubspot_url||'',
   }))
   const ws = XLSX.utils.json_to_sheet(data)
-  ws['!cols'] = [14,32,24,22,14,10,12,24,28,18,18,18,18,18,16,14,14,16,40,16,24,20,40].map(w=>({wch:w}))
+  // Anchos de columna
+  const cols = [14,32,14,16,24,22,14,10,12,24,28,18,18,18,22,22,22,12,16,24,20,40,10,18,24,16,16,16,16,16,10,14,14,16,14,14,14,16,16,16,16,16,16,16,40]
+  ws['!cols'] = cols.map(w=>({wch:w}))
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb,ws,'Clientes Legalizados')
   XLSX.writeFile(wb,nombreArchivo)
-  toast.success(`✅ ${nombreArchivo} — ${rows.length} registros`)
+  toast.success(`✅ ${nombreArchivo} — ${rows.length} registros · ${data[0] ? Object.keys(data[0]).length : 0} columnas`)
 }
 
 // Exportar rechazados + caídas
@@ -414,13 +501,18 @@ async function exportRechazadosXLSX(rows:any[]) {
     'Nombre':             r.nombre_legalizacion||'',
     'Tipo':               r.etapa_codigo==='negocio_rechazado'?'Rechazado':'Venta Caída',
     'Comprador':          r.nombrecomprador||'',
-    'Documento':          r.documento_comprador_1||'',
+    'Documento 1':        r.documento_comprador_1||'',
+    'Documento 2':        r.documento_comprador_2||'',
     'Proyecto':           r.proyecto||'',
     'Director':           r.director||'',
     'Ciudad':             r.ciudad||'',
     'Valor COP':          r.valor_del_inmueble||'',
     'Motivo Observación': r.motivo_de_observacion||'',
-    'Canal':              r.canal_atribucion||'',
+    'Canal Atribución':   r.canal_atribucion||'',
+    'Canal Gestión Ppal': r.canal_gestion_original||'',
+    'Canal Gestión Sec.': r.canal_gestion_secundario||'',
+    'SARLAFT':            r.estado_sarlaft||'',
+    'Decisión Final':     r.decision_final||'',
     'Fecha':              r.fecha_aprobacion_final||'',
     'URL HubSpot':        r.hubspot_url||'',
   }))
@@ -2592,6 +2684,7 @@ export default function Dashboard() {
                         <th style={{textAlign:'center'}}>Motivo</th>
                         <th>Stage</th>
                         <th>Canal</th>
+                        <th>Canal Sec.</th>
                         <th style={{textAlign:'right'}}>Valor</th>
                         <th style={{textAlign:'right'}}>Lead time</th>
                         <th style={{textAlign:'center'}}>HubSpot</th>
@@ -2632,6 +2725,7 @@ export default function Dashboard() {
                                 </span>
                               </td>
                               <td style={{fontSize:11,color:'rgba(18,81,96,.55)'}}>{r.canal_atribucion||'—'}</td>
+                              <td style={{fontSize:11,color:'rgba(18,81,96,.55)'}}>{r.canal_gestion_secundario||'—'}</td>
                               <td style={{textAlign:'right',fontSize:11,fontWeight:700,color:T}}>{fM(r.valor_del_inmueble)}</td>
                               <td style={{textAlign:'right',fontSize:12,fontWeight:700,color:ltCol}}>{fD(r.dias_lead_time)}</td>
                               <td style={{textAlign:'center'}}>
