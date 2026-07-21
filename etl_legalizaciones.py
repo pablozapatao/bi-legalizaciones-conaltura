@@ -212,7 +212,7 @@ def asignar_director(proyecto: Optional[str]) -> str:
                               "AZZURI","AZZURRI","TOSCANA","CAOBA"]):
         return "Natalia Giraldo"
     if any(x in n for x in ["FAROVERDE","FARO VERDE","PALMA","CRISTA","MUNAY",
-                              "KIVA","WE SENIOR","WE","SENIOR"]):
+                              "KIVA","WE SENIOR","WE","SENIOR", "SINGARA", "SINGAARA"]):
         return "Patricia Herrera"
     return "SIN ASIGNAR"
 
