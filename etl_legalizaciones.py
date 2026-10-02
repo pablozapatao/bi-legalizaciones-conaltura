@@ -249,13 +249,37 @@ def hubspot_get(url: str, params: Dict = None, timeout: int = 90) -> Dict:
             return r.json()
         except requests.exceptions.Timeout:
             print(f"   ⚠️  Timeout intento {intento+1}/3")
-            time.sleep(5)
+            if intento == 2:
+                raise
+            time.sleep(5 * (intento + 1))
         except requests.exceptions.RequestException as e:
             if intento == 2:
                 raise
             print(f"   ⚠️  Error intento {intento+1}/3: {e}")
-            time.sleep(3)
-    return {}
+            time.sleep(3 * (intento + 1))
+    # Solo se llega aquí si los 3 intentos fueron 429: NO devolver {} (truncaría la extracción en silencio)
+    raise RuntimeError(f"HubSpot: rate limit (429) persistente tras 3 intentos en {url}")
+
+def hubspot_post(url: str, payload: Dict, timeout: int = 60) -> Dict:
+    """POST con reintentos (429 / 5xx / timeouts). Lanza excepción si agota intentos."""
+    headers = {"Authorization": f"Bearer {HUBSPOT_TOKEN}", "Content-Type": "application/json"}
+    ultimo = None
+    for intento in range(4):
+        try:
+            r = requests.post(url, headers=headers, json=payload, timeout=timeout)
+            if r.status_code == 429 or r.status_code >= 500:
+                wait = int(r.headers.get("Retry-After", 5 * (intento + 1)))
+                print(f"   ⏳ HTTP {r.status_code}. Reintento en {wait}s ({intento+1}/4)...")
+                ultimo = RuntimeError(f"HTTP {r.status_code}")
+                time.sleep(wait)
+                continue
+            r.raise_for_status()
+            return r.json()
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            ultimo = e
+            print(f"   ⚠️  {type(e).__name__} intento {intento+1}/4")
+            time.sleep(3 * (intento + 1))
+    raise RuntimeError(f"HubSpot POST falló tras 4 intentos en {url}: {ultimo}")
 
 def get_portal_id_api() -> str:
     try:
@@ -298,18 +322,15 @@ def fetch_associations_to_deals(legal_ids: List[str]) -> Dict[str, str]:
     url     = "https://api.hubapi.com/crm/v4/associations/2-58255488/deals/batch/read"
     headers = {"Authorization": f"Bearer {HUBSPOT_TOKEN}", "Content-Type": "application/json"}
     legal_to_deal = {}
+    lotes_fallidos = 0
     BATCH = 100
 
     for i in range(0, len(legal_ids), BATCH):
         lote    = legal_ids[i:i+BATCH]
         payload = {"inputs": [{"id": lid} for lid in lote]}
         try:
-            r = requests.post(url, headers=headers, json=payload, timeout=60)
-            if r.status_code == 429:
-                time.sleep(int(r.headers.get("Retry-After","10")))
-                r = requests.post(url, headers=headers, json=payload, timeout=60)
-            r.raise_for_status()
-            for item in r.json().get("results", []):
+            data_a = hubspot_post(url, payload)
+            for item in data_a.get("results", []):
                 fid    = str(item.get("from",{}).get("id",""))
                 to_lst = item.get("to",[])
                 if to_lst:
@@ -317,12 +338,16 @@ def fetch_associations_to_deals(legal_ids: List[str]) -> Dict[str, str]:
                     if did:
                         legal_to_deal[fid] = did
         except Exception as e:
-            print(f"   ⚠️  Lote {i//BATCH+1}: {e}")
-            time.sleep(2)
+            lotes_fallidos += 1
+            print(f"   ⚠️  Lote asociaciones {i//BATCH+1}: {e}")
         if (i//BATCH+1) % 5 == 0:
             print(f"  📦 {min(i+BATCH,len(legal_ids))}/{len(legal_ids)} procesados")
 
-    print(f"✅ {len(legal_to_deal)}/{len(legal_ids)} con Deal\n")
+    n_lotes = (len(legal_ids) + BATCH - 1) // BATCH
+    if n_lotes and lotes_fallidos > max(1, n_lotes // 10):
+        # Cargar con canales vacíos sobrescribiría datos buenos (TRUNCATE): abortar.
+        raise RuntimeError(f"{lotes_fallidos}/{n_lotes} lotes de asociaciones fallaron; abortando para no perder canales")
+    print(f"✅ {len(legal_to_deal)}/{len(legal_ids)} con Deal ({lotes_fallidos} lotes fallidos)\n")
     return legal_to_deal
 
 def fetch_deals_by_ids(deal_ids: List[str]) -> Dict[str, Dict]:
@@ -330,26 +355,25 @@ def fetch_deals_by_ids(deal_ids: List[str]) -> Dict[str, Dict]:
         return {}
     print(f"⏳ Enriqueciendo {len(deal_ids)} deals...")
     url     = "https://api.hubapi.com/crm/v3/objects/deals/batch/read"
-    headers = {"Authorization": f"Bearer {HUBSPOT_TOKEN}", "Content-Type": "application/json"}
     deals_map = {}
+    lotes_fallidos = 0
     BATCH = 100
 
     for i in range(0, len(deal_ids), BATCH):
         lote    = deal_ids[i:i+BATCH]
         payload = {"properties": DEAL_PROPS, "inputs": [{"id": did} for did in lote]}
         try:
-            r = requests.post(url, headers=headers, json=payload, timeout=60)
-            if r.status_code == 429:
-                time.sleep(int(r.headers.get("Retry-After","10")))
-                r = requests.post(url, headers=headers, json=payload, timeout=60)
-            r.raise_for_status()
-            for item in r.json().get("results",[]):
-                deals_map[str(item["id"])] = item.get("properties",{})
+            data_d = hubspot_post(url, payload)
+            for item in data_d.get("results", []):
+                deals_map[str(item["id"])] = item.get("properties") or {}
         except Exception as e:
+            lotes_fallidos += 1
             print(f"   ⚠️  Lote deals {i//BATCH+1}: {e}")
-            time.sleep(2)
 
-    print(f"✅ {len(deals_map)} deals enriquecidos\n")
+    n_lotes = (len(deal_ids) + BATCH - 1) // BATCH
+    if n_lotes and lotes_fallidos > max(1, n_lotes // 10):
+        raise RuntimeError(f"{lotes_fallidos}/{n_lotes} lotes de deals fallaron; abortando para no perder canales")
+    print(f"✅ {len(deals_map)} deals enriquecidos ({lotes_fallidos} lotes fallidos)\n")
     return deals_map
 
 
@@ -382,6 +406,13 @@ def dias_entre(dt1: Optional[datetime], dt2: Optional[datetime]) -> Optional[flo
     if not dt1 or not dt2:
         return None
     return round((dt2-dt1).total_seconds()/86400, 2)
+
+def _to_float(valor) -> Optional[float]:
+    """float tolerante: None, '' o texto no numérico -> None (no rompe transformar)."""
+    try:
+        return float(valor) or None
+    except (TypeError, ValueError):
+        return None
 
 def dt_from_date(d: Optional[date]) -> Optional[datetime]:
     if not d:
@@ -427,7 +458,7 @@ def calcular_ventana_cierre(
 # ⚙️ TRANSFORMACIÓN POR REGISTRO
 # ==========================================
 def transform_legalizacion(record, legal_to_deal, deals_map, portal_id) -> Dict:
-    props  = record.get("properties", {})
+    props  = record.get("properties") or {}
     obj_id = str(record.get("id", props.get("hs_object_id","")))
 
     # Stage
@@ -469,7 +500,7 @@ def transform_legalizacion(record, legal_to_deal, deals_map, portal_id) -> Dict:
     proyecto_limpio = limpiar_nombre_proyecto(raw_proyecto)
 
     deal_id    = legal_to_deal.get(obj_id)
-    deal_props = deals_map.get(str(deal_id),{}) if deal_id else {}
+    deal_props = (deals_map.get(str(deal_id)) or {}) if deal_id else {}
 
     if proyecto_limpio == "SIN ASIGNAR":
         raw_deal = (deal_props.get("lista_proyectos_negocios_sinco") or
@@ -540,7 +571,7 @@ def transform_legalizacion(record, legal_to_deal, deals_map, portal_id) -> Dict:
         "ciudad":                   ciudad,
         "director":                 director,
         "torre":                    props.get("torre",""),
-        "valor_del_inmueble":       float(props.get("valor_del_inmueble") or 0) or None,
+        "valor_del_inmueble":       _to_float(props.get("valor_del_inmueble")),
         "tipo_de_cuenta_de_consignacion_de_separacion": props.get("tipo_de_cuenta_de_consignacion_de_separacion",""),
         "nombrecomprador":          props.get("nombrecomprador",""),
         "documento_comprador_1":    props.get("documento_comprador_1",""),
@@ -560,9 +591,9 @@ def transform_legalizacion(record, legal_to_deal, deals_map, portal_id) -> Dict:
         **date_entered,
         "deal_id":                  int(deal_id) if deal_id and str(deal_id).isdigit() else None,
         "dealstage":                deal_props.get("dealstage",""),
-        "canal_atribucion":         deal_props.get("canal_de_atribucion_conaltura_negocio",""),
-        "canal_gestion_original":   deal_props.get("canal_de_gestion_comercial_original_negocio",""),
-        "canal_gestion_secundario": deal_props.get("canal_de_gestion_comercial_secundario_negocio",""),
+        "canal_atribucion":         deal_props.get("canal_de_atribucion_conaltura_negocio") or "",
+        "canal_gestion_original":   deal_props.get("canal_de_gestion_comercial_original_negocio") or "",
+        "canal_gestion_secundario": deal_props.get("canal_de_gestion_comercial_secundario_negocio") or "",
         "numero_unidad":            deal_props.get("numero_de_la_unidad_del_proyecto___negocio_conaltura",""),
         "invdescunidad":            deal_props.get("invdescunidad",""),
         "dias_en_consignacion":         dias_en_consignacion,
@@ -803,9 +834,25 @@ def load_to_neon(df: pd.DataFrame, engine) -> None:
                 hubspot_url TEXT, updated_at TIMESTAMPTZ
             )
         """))
-        conn.execute(text("TRUNCATE TABLE raw_legalizaciones"))
+        # date_entered_aprobado_gerencia no está en schema.sql: se agrega idempotentemente
+        conn.execute(text("ALTER TABLE raw_legalizaciones "
+                          "ADD COLUMN IF NOT EXISTS date_entered_aprobado_gerencia TIMESTAMPTZ"))
 
-    df.to_sql("raw_legalizaciones", engine, if_exists="append", index=False, method="multi")
+    # Columnas del DataFrame que no existen en la tabla -> se omiten con aviso (no fallar la carga)
+    with engine.connect() as conn:
+        cols_tabla = {r[0] for r in conn.execute(text(
+            "SELECT column_name FROM information_schema.columns WHERE table_name='raw_legalizaciones'"))}
+    extra = [c for c in df.columns if c not in cols_tabla]
+    if extra:
+        print(f"  ⚠️  Columnas ausentes en la tabla, se omiten: {extra}")
+        df = df[[c for c in df.columns if c in cols_tabla]]
+
+    # TRUNCATE + INSERT en UNA transacción: si el INSERT falla, se revierte el TRUNCATE
+    # y el dashboard conserva los datos anteriores.
+    with engine.begin() as conn:
+        conn.execute(text("TRUNCATE TABLE raw_legalizaciones"))
+        df.to_sql("raw_legalizaciones", conn, if_exists="append", index=False,
+                  method="multi", chunksize=500)
     print(f"  ✅ {len(df)} filas insertadas")
 
     # bi_legalizaciones_final — DROP + CREATE AS SELECT (reconstrucción completa)
@@ -894,6 +941,36 @@ def load_to_neon(df: pd.DataFrame, engine) -> None:
 # ==========================================
 # 📊 DIAGNÓSTICO POST-CARGA (cuadre matemático)
 # ==========================================
+def resumen_final(df: pd.DataFrame, engine, n_extraidos: int, inicio: float) -> None:
+    """Resumen de corrida exitosa, leído de la BD (lo realmente cargado)."""
+    with engine.connect() as conn:
+        r = conn.execute(text("""
+            SELECT COUNT(*),
+                   COUNT(*) FILTER (WHERE NULLIF(TRIM(canal_gestion_original),'')   IS NOT NULL),
+                   COUNT(*) FILTER (WHERE NULLIF(TRIM(canal_gestion_secundario),'') IS NOT NULL),
+                   COUNT(*) FILTER (WHERE etapa_codigo='aprobado_gerencia'),
+                   MAX(updated_at)
+            FROM raw_legalizaciones
+        """)).fetchone()
+    total, n_orig, n_sec, n_ger, upd = r
+    pct = lambda n: (n / total * 100) if total else 0.0
+    upd_col = upd.astimezone(TZ_COLOMBIA).strftime("%Y-%m-%d %H:%M:%S") if upd else "N/D"
+    minutos = (time.time() - inicio) / 60
+    print("=" * 70)
+    print("🎉 ETL LEGALIZACIONES v3.0 — RESUMEN DE CORRIDA EXITOSA")
+    print("=" * 70)
+    print(f"  Registros extraídos (HubSpot)   : {n_extraidos}")
+    print(f"  Registros insertados (Neon)     : {total}")
+    print(f"  Con canal_gestion_original      : {n_orig}  ({pct(n_orig):.1f}%)")
+    print(f"  Con canal_gestion_secundario    : {n_sec}  ({pct(n_sec):.1f}%)")
+    print(f"  Con aprobado_gerencia           : {n_ger}")
+    print(f"  Última actualización (Colombia) : {upd_col}")
+    print(f"  Duración                        : {minutos:.2f} min")
+    print("=" * 70)
+    if total != len(df):
+        raise RuntimeError(f"Inconsistencia: DataFrame={len(df)} vs insertados en BD={total}")
+
+
 def diagnostico_db(engine) -> None:
     print("\n" + "=" * 70)
     print("📊 DIAGNÓSTICO POST-CARGA — CUADRE MATEMÁTICO")
@@ -914,7 +991,8 @@ def diagnostico_db(engine) -> None:
                 COUNT(*) FILTER (WHERE etapa_codigo='negocio_rechazado')  AS n_rechazado,
                 COUNT(*) FILTER (WHERE deal_id IS NOT NULL)               AS con_deal,
                 COUNT(*) FILTER (WHERE proyecto_limpio='SIN ASIGNAR')     AS sin_proyecto,
-                COUNT(*) FILTER (WHERE en_ventana_cierre=TRUE)            AS en_ventana
+                COUNT(*) FILTER (WHERE en_ventana_cierre=TRUE)            AS en_ventana,
+                COUNT(*) FILTER (WHERE etapa_codigo='aprobado_gerencia')  AS n_gerencia
             FROM raw_legalizaciones
         """)).fetchone()
 
@@ -926,6 +1004,7 @@ def diagnostico_db(engine) -> None:
         n_exitoso    = r[5]
         n_novedades  = r[6]
         n_rechazado  = r[7]
+        n_gerencia   = r[11]
 
         print(f"\n  ┌─ CUADRE 1: Cohortes (deben sumar el total)")
         print(f"  │  Total registros          : {total}")
@@ -937,11 +1016,12 @@ def diagnostico_db(engine) -> None:
         ok1 = "✅ OK" if cuadre1 == total else f"❌ DIFERENCIA: {total - cuadre1}"
         print(f"  │  Suma cohortes            : {cuadre1}  ← {ok1}")
 
-        print(f"\n  ├─ CUADRE 2: Resolución (exitoso + novedades + rechazado = resolución)")
+        print(f"\n  ├─ CUADRE 2: Resolución (exitoso + novedades + gerencia + rechazado = resolución)")
         print(f"  │  Aprobadas sin novedades  : {n_exitoso}")
         print(f"  │  Aprobadas con novedades  : {n_novedades}")
         print(f"  │  Rechazadas               : {n_rechazado}")
-        cuadre2 = n_exitoso + n_novedades + n_rechazado
+        print(f"  │  Aprobadas por Gerencia   : {n_gerencia}")
+        cuadre2 = n_exitoso + n_novedades + n_gerencia + n_rechazado
         ok2 = "✅ OK" if cuadre2 == n_resolucion else f"❌ DIFERENCIA: {n_resolucion - cuadre2}"
         print(f"  │  Suma resolución          : {cuadre2}  ← {ok2}")
         print(f"  │  Registros grupo resolución: {n_resolucion}")
@@ -1132,11 +1212,7 @@ if __name__ == "__main__":
         load_to_neon(df, engine)
         diagnostico_db(engine)
 
-        elapsed = time.time() - start
-        print("=" * 70)
-        print(f"🎉 ETL LEGALIZACIONES v3.0 COMPLETADO")
-        print(f"⏱️  Tiempo total: {elapsed:.1f}s")
-        print("=" * 70)
+        resumen_final(df, engine, len(records), start)
 
     except Exception as e:
         print(f"\n{'='*70}\n💥 ERROR CRÍTICO: {e}\n{'='*70}")

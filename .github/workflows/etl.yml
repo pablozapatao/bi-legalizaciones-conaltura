@@ -26,6 +26,7 @@ jobs:
           && format('ETL [{0}] — manual', inputs.modo)
           || 'ETL [completo] — automático' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       # 1. Checkout
@@ -86,6 +87,13 @@ jobs:
           HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
           DATABASE_URL:    ${{ secrets.DATABASE_URL }}
         run: python etl_legalizaciones.py
+
+      # 5e. Error visible en la UI de Actions si algo falló
+      - name: 🚨 Reportar fallo
+        if: failure()
+        run: |
+          echo "::error title=ETL Legalizaciones FALLÓ::Run ${{ github.run_id }} (${{ github.event_name }}, modo ${{ github.event.inputs.modo || 'completo' }}). Revisa los logs; el dashboard puede estar con datos desactualizados. ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          exit 1
 
       # 6. Resumen
       - name: ✅ Resumen
