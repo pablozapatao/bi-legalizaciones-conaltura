@@ -1,7 +1,7 @@
 // GET /api/detalle — tabla completa con todos los campos relevantes
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import sql, { parseFiltros, periodoActual } from '@/lib/db'
+import sql, { parseFiltros, periodoActual, ciudadList, semanaRango } from '@/lib/db'
 import { STAGE_LABELS } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -48,7 +48,11 @@ export async function GET(req: NextRequest) {
 
     if (f.proyecto)         { vals.push(f.proyecto);         clauses.push(`proyecto_limpio = $${vals.length}`) }
     if (f.director)         { vals.push(f.director);         clauses.push(`director = $${vals.length}`) }
-    if (f.ciudad)           { vals.push(f.ciudad);           clauses.push(`ciudad = $${vals.length}`) }
+    if (f.ciudad)           { vals.push(ciudadList(f.ciudad)); clauses.push(`ciudad = ANY($${vals.length}::text[])`) }
+    const sw = semanaRango(f.semana)
+    if (sw) clauses.push(`(fecha_aprobacion_final IS NULL OR EXTRACT(DAY FROM fecha_aprobacion_final) BETWEEN ${sw[0]} AND ${sw[1]})`)
+    const etapa = params.get('etapa')
+    if (etapa) { vals.push(etapa); clauses.push(`etapa_codigo = $${vals.length}`) }
     if (f.canal_atribucion) { vals.push(f.canal_atribucion); clauses.push(`canal_atribucion = $${vals.length}`) }
     if (f.canal_gestion)    { vals.push(f.canal_gestion);    clauses.push(`canal_gestion_original = $${vals.length}`) }
 

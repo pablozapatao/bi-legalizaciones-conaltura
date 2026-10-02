@@ -30,6 +30,17 @@ function numOrNull(v: string | null): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+// Ciudades múltiples: 'Medellín,Bogotá' -> ['Medellín','Bogotá']
+export function ciudadList(c: string | null | undefined): string[] {
+  return (c ?? '').split(',').map(x => x.trim()).filter(Boolean)
+}
+
+// Cohorte semanal S1..S5 -> rango de días del mes (aplica a fechas de aprobación)
+export function semanaRango(s: number | null | undefined): [number, number] | null {
+  if (!s || s < 1 || s > 5) return null
+  return [[1,7],[8,14],[15,21],[22,28],[29,31]][s - 1] as [number, number]
+}
+
 export function parseFiltros(params: URLSearchParams) {
   return {
     anio:             numOrNull(params.get('anio')),
@@ -39,6 +50,7 @@ export function parseFiltros(params: URLSearchParams) {
     ciudad:           params.get('ciudad')    || null,
     canal_atribucion: params.get('canal_atribucion') || null,
     canal_gestion:    params.get('canal_gestion')    || null,
+    semana:           numOrNull(params.get('semana')),
   }
 }
 
@@ -60,10 +72,16 @@ export function dimFilters(
 ): { sql: string; vals: unknown[] } {
   const vals: unknown[] = []
   const parts: string[] = []
-  const add = (col: string, v: unknown) => { vals.push(v); parts.push(`AND ${col} = $${startAt + vals.length}`) }
+  const add = (col: string, v: unknown, cast = '', op: 'ANY' | '=' = '=') => {
+    vals.push(v)
+    const ph = `$${startAt + vals.length}${cast}`
+    parts.push(op === 'ANY' ? `AND ${col} = ANY(${ph})` : `AND ${col} = ${ph}`)
+  }
+  const sw = semanaRango(f.semana)
+  if (sw) parts.push(`AND (fecha_aprobacion_final IS NULL OR EXTRACT(DAY FROM fecha_aprobacion_final) BETWEEN ${sw[0]} AND ${sw[1]})`)
   if (f.proyecto)  add('proyecto_limpio', f.proyecto)
   if (f.director)  add('director', f.director)
-  if (f.ciudad)    add('ciudad', f.ciudad)
+  if (f.ciudad)    add('ciudad', ciudadList(f.ciudad), '::text[]', 'ANY')
   if (opts.canales !== false) {
     if (f.canal_atribucion) add('canal_atribucion', f.canal_atribucion)
     if (f.canal_gestion)    add('canal_gestion_original', f.canal_gestion)
@@ -92,7 +110,7 @@ export function buildWhere(
   if (f.mes)              { vals.push(f.mes);              clauses.push(`${col('mes')} = $${vals.length}`) }
   if (f.proyecto)         { vals.push(f.proyecto);         clauses.push(`${col('proyecto_limpio')} = $${vals.length}`) }
   if (f.director)         { vals.push(f.director);         clauses.push(`${col('director')} = $${vals.length}`) }
-  if (f.ciudad)           { vals.push(f.ciudad);           clauses.push(`${col('ciudad')} = $${vals.length}`) }
+  if (f.ciudad)           { vals.push(ciudadList(f.ciudad)); clauses.push(`${col('ciudad')} = ANY($${vals.length}::text[])`) }
   if (f.canal_atribucion) { vals.push(f.canal_atribucion); clauses.push(`${col('canal_atribucion')} = $${vals.length}`) }
   if (f.canal_gestion)    { vals.push(f.canal_gestion);    clauses.push(`${col('canal_gestion_original')} = $${vals.length}`) }
 

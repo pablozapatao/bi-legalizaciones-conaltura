@@ -12,6 +12,7 @@ export interface Filtros {
   ciudad?:            string
   canal_atribucion?:  string
   canal_gestion?:     string
+  semana?:            number   // cohorte semanal 1..5 (días 1-7, 8-14, ...)
 }
 
 // ── Constantes de dominio ─────────────────────────────────────────────────
