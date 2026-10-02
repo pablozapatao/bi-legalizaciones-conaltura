@@ -390,9 +390,13 @@ def parse_fecha(valor) -> Optional[date]:
     if not valor:
         return None
     try:
-        v = str(valor)
+        v = str(valor).strip()
         if v.isdigit() and len(v) > 10:
             return datetime.fromtimestamp(int(v)/1000, tz=timezone.utc).astimezone(TZ_COLOMBIA).date()
+        # Propiedad de tipo fecha de HubSpot ("2026-09-01"): ya es la fecha calendario.
+        # Convertirla vía datetime/astimezone la corría un día atrás (medianoche UTC -> COL).
+        if len(v) == 10:
+            return date.fromisoformat(v)
         return datetime.fromisoformat(v.replace("Z","+00:00")).astimezone(TZ_COLOMBIA).date()
     except Exception:
         return None
