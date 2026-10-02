@@ -58,7 +58,13 @@ PORTAL_ID     = "47845317"
 # Una sola variable para la BD — consistente en ETL (GitHub Secrets)
 # y en dashboard (Vercel env var).
 # Formato Neon: postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require
-DATABASE_URL = os.environ.get("DATABASE_URL", "")
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+# Normaliza al driver instalado (psycopg2). Acepta postgres://, postgresql://
+# y postgresql+psycopg:// (que exigiría psycopg v3, no incluido en requirements).
+for _pref in ("postgres://", "postgresql://", "postgresql+psycopg://"):
+    if DATABASE_URL.startswith(_pref):
+        DATABASE_URL = "postgresql+psycopg2://" + DATABASE_URL[len(_pref):]
+        break
 
 # ==========================================
 # MAPEO DE STAGES — OFICIAL
