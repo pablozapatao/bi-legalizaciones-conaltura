@@ -1,7 +1,7 @@
 // GET /api/canales?anio=2025&mes=6&proyecto=...&director=...
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import sql, { parseFiltros } from '@/lib/db'
+import sql, { parseFiltros, periodoActual, dimFilters, APROBADAS_SQL } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +17,7 @@ async function queryCanal(
     SELECT
       ${campo}                                                          AS canal,
       COUNT(*) FILTER (
-        WHERE etapa_codigo IN ('aprobado_exitoso','aprobado_novedades')
+        WHERE etapa_codigo IN (${APROBADAS_SQL})
           AND anio=$1 AND mes=$2
       )                                                                 AS aprobadas,
       COUNT(*) FILTER (WHERE etapa_codigo='aprobado_exitoso'  AND anio=$1 AND mes=$2) AS exitosas,
@@ -53,16 +53,12 @@ async function queryCanal(
 export async function GET(req: NextRequest) {
   try {
     const f    = parseFiltros(req.nextUrl.searchParams)
-    const nowCOL = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }))
-    const anio = f.anio ?? nowCOL.getFullYear()
-    const mes  = f.mes  ?? (nowCOL.getMonth() + 1)
+    const { anio, mes } = periodoActual(f)
 
-    const extraParts: string[] = []
-    const baseVals: unknown[]  = [anio, mes]
-    if (f.proyecto) { baseVals.push(f.proyecto); extraParts.push(`proyecto_limpio = $${baseVals.length}`) }
-    if (f.director) { baseVals.push(f.director); extraParts.push(`director = $${baseVals.length}`) }
-    if (f.ciudad)   { baseVals.push(f.ciudad);   extraParts.push(`ciudad = $${baseVals.length}`) }
-    const extra = extraParts.length ? 'AND ' + extraParts.join(' AND ') : ''
+    // Los filtros de canal no se aplican aquí: este endpoint ya desglosa por canal
+    const dim = dimFilters(f, 2, { canales: false })
+    const baseVals: unknown[] = [anio, mes, ...dim.vals]
+    const extra = dim.sql
 
     const [atr, orig, sec] = await Promise.all([
       queryCanal('canal_atribucion',        'atribucion',          anio, mes, extra, [...baseVals]),

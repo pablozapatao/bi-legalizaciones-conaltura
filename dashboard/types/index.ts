@@ -22,13 +22,14 @@ export const STAGE_LABELS: Record<string, string> = {
   revision_sinco:    'Revisión SINCO',
   aprobado_exitoso:  'Aprobado Exitoso',
   aprobado_novedades:'Aprobado con Novedades',
+  aprobado_gerencia: 'Aprob. Gerencia',
   negocio_rechazado: 'Negocio Rechazado',
   venta_caida:       'Venta Caída',
 }
 
 export const STAGE_ORDEN = [
   'consignacion', 'legal_espera', 'legal_aprobada_dir', 'revision_sinco',
-  'aprobado_exitoso', 'aprobado_novedades', 'negocio_rechazado', 'venta_caida',
+  'aprobado_exitoso', 'aprobado_novedades', 'aprobado_gerencia', 'negocio_rechazado', 'venta_caida',
 ] as const
 
 export const CIUDADES = ['Medellín','Bogotá','Barranquilla','Cartagena','Cali'] as const
@@ -46,6 +47,7 @@ export interface KpisResponse {
   total_resolucion:     number   // KPI 1 — total del mes
   aprobadas_exitoso:    number   // KPI 2
   aprobadas_novedades:  number   // KPI 3
+  aprobadas_gerencia:   number   // Aprobadas por Gerencia Comercial (con novedades)
   rechazadas:           number   // KPI 4
   // KPI 5: cohorte C (date_entered_venta_caida en el período)
   ventas_caidas:        number
@@ -54,7 +56,7 @@ export interface KpisResponse {
   pct_ventana_cierre:   number   // porcentaje sobre aprobadas
   // KPI 7: % cumplimiento vs meta
   meta_negocios:        number   // de manual_metas (0 si no hay)
-  pct_cumplimiento:     number   // (aprobadas / meta) * 100
+  pct_cumplimiento:     number   // ((exitoso+novedades+gerencia) / meta) * 100
   // Contexto
   anio:                 number
   mes:                  number
@@ -88,9 +90,10 @@ export interface ProyectoResumen {
   proyecto:            string
   director:            string
   ciudad:              string
-  aprobadas:           number   // exitoso + novedades
+  aprobadas:           number   // exitoso + novedades + gerencia
   exitosas:            number
   con_novedades:       number
+  aprobado_gerencia:   number
   rechazadas:          number
   ventas_caidas:       number
   pipeline_activo:     number
@@ -112,9 +115,10 @@ export interface TendenciaMes {
   anio:               number
   mes:                number
   label:              string   // "Ene 2025"
-  aprobadas:          number   // exitoso + novedades
+  aprobadas:          number   // exitoso + novedades + gerencia
   exitosas:           number
   con_novedades:      number
+  aprobado_gerencia:  number
   rechazadas:         number
   ventas_caidas:      number
   pipeline_activo:    number
@@ -222,6 +226,8 @@ export interface MapaCiudad {
   // Coordenadas para el SVG (posición relativa sobre el mapa de Colombia)
   lat:              number
   lng:              number
+  svgX:             number
+  svgY:             number
   aprobadas:        number
   pipeline_activo:  number
   ventas_caidas:    number
@@ -245,14 +251,46 @@ export interface DetalleRow {
   proyecto:                string
   director:                string
   ciudad:                  string
+  torre:                   string
   canal_atribucion:        string
+  canal_gestion_original:  string
+  canal_gestion_secundario: string
   nombrecomprador:         string
+  documento_comprador_1:   string
+  documento_comprador_2:   string
   valor_del_inmueble:      number | null
+  tipo_cuenta_consignacion: string
   fecha_aprobacion_final:  string | null
   dias_lead_time:          number | null
   aging_dias:              number | null
   en_ventana_cierre:       boolean
+  motivo_de_observacion:   string
+  motivo_semaforo:         'verde' | 'amarillo' | 'rojo' | null
+  verificacion_documental: string
+  estado_sarlaft:          string
+  decision_final:          string
+  invdescunidad:           string
+  numero_unidad:           string
+  propietario_del_negocio: string
+  id_negocio_origen:       number | null
+  deal_id:                 number | null
   hubspot_url:             string
+  fecha_envio_sarlaft:     string | null
+  fecha_respuesta_sarlaft: string | null
+  dias_en_consignacion:    number | null
+  dias_en_legal_espera:    number | null
+  dias_en_legal_aprobada:  number | null
+  dias_en_revision_sinco:  number | null
+  fecha_creacion:          string | null
+  fecha_modificacion:      string | null
+  date_entered_consignacion:       string | null
+  date_entered_legal_espera:       string | null
+  date_entered_legal_aprobada_dir: string | null
+  date_entered_revision_sinco:     string | null
+  date_entered_aprobado_exitoso:   string | null
+  date_entered_aprobado_novedades: string | null
+  date_entered_negocio_rechazado:  string | null
+  date_entered_venta_caida:        string | null
 }
 
 export interface DetalleResponse {
@@ -260,6 +298,47 @@ export interface DetalleResponse {
   total:   number
   pagina:  number
   por_pagina: number
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 9b. Ventana de cierre  →  GET /api/ventana
+// ─────────────────────────────────────────────────────────────────────────
+export interface VentanaProyecto {
+  proyecto:      string
+  director:      string
+  ciudad:        string
+  total:         number
+  exitosas:      number
+  con_novedades: number
+  gerencia:      number
+  dia_promedio:  number
+  valor_total:   number | null
+}
+
+export interface VentanaCliente {
+  hs_object_id:           number
+  nombre_legalizacion:    string
+  nombrecomprador:        string
+  documento_comprador_1:  string
+  proyecto:               string
+  director:               string
+  ciudad:                 string
+  torre:                  string
+  numero_unidad:          string
+  etapa_codigo:           StageCode
+  etapa_label:            string
+  canal_atribucion:       string
+  valor_del_inmueble:     number | null
+  fecha_aprobacion_final: string | null
+  dia_aprobacion:         number
+  motivo_de_observacion:  string
+  hubspot_url:            string
+}
+
+export interface VentanaResponse {
+  total:        number
+  por_proyecto: VentanaProyecto[]
+  clientes:     VentanaCliente[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────

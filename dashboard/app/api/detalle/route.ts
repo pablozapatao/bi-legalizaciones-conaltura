@@ -1,7 +1,7 @@
 // GET /api/detalle — tabla completa con todos los campos relevantes
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import sql, { parseFiltros } from '@/lib/db'
+import sql, { parseFiltros, periodoActual } from '@/lib/db'
 import { STAGE_LABELS } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -20,13 +20,11 @@ export async function GET(req: NextRequest) {
     const params     = req.nextUrl.searchParams
     const f          = parseFiltros(params)
     const grupo      = params.get('grupo') ?? null
-    const pagina     = Math.max(1, Number(params.get('pagina')    ?? 1))
-    const por_pagina = Math.min(5000, Number(params.get('por_pagina') ?? 50))
+    const pagina     = Math.max(1, Number(params.get('pagina') ?? 1) || 1)
+    const por_pagina = Math.min(5000, Math.max(1, Number(params.get('por_pagina') ?? 50) || 50))
     const offset     = (pagina - 1) * por_pagina
 
-    const nowCOL = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }))
-    const anio   = f.anio ?? nowCOL.getFullYear()
-    const mes    = f.mes  ?? (nowCOL.getMonth() + 1)
+    const { anio, mes } = periodoActual(f)
 
     const vals: unknown[] = []
     const clauses: string[] = []

@@ -2,7 +2,7 @@
 // Cohorte A (pipeline activo) + cohorte C (caídas del mes).
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import sql, { parseFiltros } from '@/lib/db'
+import sql, { parseFiltros, periodoActual, dimFilters } from '@/lib/db'
 import { STAGE_LABELS } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -13,19 +13,15 @@ export async function GET(req: NextRequest) {
   try {
     const params = req.nextUrl.searchParams
     const f      = parseFiltros(params)
-    const nowCOL = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }))
-    const anio   = f.anio ?? nowCOL.getFullYear()
-    const mes    = f.mes  ?? (nowCOL.getMonth() + 1)
+    const { anio, mes } = periodoActual(f)
 
     // ── Pipeline activo (snapshot: sin fecha_aprobacion_final) ───────────
+    const dim = dimFilters(f, 0)
     const extraWhere = [
       "fecha_aprobacion_final IS NULL",
       "grupo = 'pipeline'",
     ]
-    const vals: unknown[] = []
-    if (f.proyecto) { vals.push(f.proyecto); extraWhere.push(`proyecto_limpio = $${vals.length}`) }
-    if (f.director) { vals.push(f.director); extraWhere.push(`director = $${vals.length}`) }
-    if (f.ciudad)   { vals.push(f.ciudad);   extraWhere.push(`ciudad = $${vals.length}`) }
+    const vals: unknown[] = dim.vals
 
     const pipeRows = await sql(`
       SELECT
@@ -34,6 +30,7 @@ export async function GET(req: NextRequest) {
         ROUND(AVG(aging_dias)::NUMERIC, 1) AS aging_promedio
       FROM raw_legalizaciones
       WHERE ${extraWhere.join(' AND ')}
+        ${dim.sql}
       GROUP BY etapa_codigo
       ORDER BY
         CASE etapa_codigo
@@ -48,16 +45,14 @@ export async function GET(req: NextRequest) {
     const totalPipeline = pipeRows.reduce((s, r) => s + Number(r.count), 0)
 
     // ── Caídas del mes (cohorte C) ────────────────────────────────────────
-    const caidaVals: unknown[] = [anio, mes]
-    const caidaExtra: string[] = []
-    if (f.proyecto) { caidaVals.push(f.proyecto); caidaExtra.push(`proyecto_limpio = $${caidaVals.length}`) }
-    if (f.director) { caidaVals.push(f.director); caidaExtra.push(`director = $${caidaVals.length}`) }
+    const cDim = dimFilters(f, 2)
+    const caidaVals: unknown[] = [anio, mes, ...cDim.vals]
 
     const caidaRows = await sql(`
       SELECT COUNT(*) AS n
       FROM raw_legalizaciones
       WHERE anio_caida = $1 AND mes_caida = $2
-        ${caidaExtra.length ? 'AND ' + caidaExtra.join(' AND ') : ''}
+        ${cDim.sql}
     `, caidaVals)
 
     return NextResponse.json({

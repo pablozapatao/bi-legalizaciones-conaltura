@@ -2,7 +2,7 @@
 // Devuelve tiempos por stage, por proyecto, y global.
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import sql, { parseFiltros } from '@/lib/db'
+import sql, { parseFiltros, periodoActual, dimFilters } from '@/lib/db'
 import { STAGE_LABELS } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -18,18 +18,11 @@ function semaforo(avg: number | null, p50Global: number): 'verde' | 'amarillo' |
 export async function GET(req: NextRequest) {
   try {
     const f    = parseFiltros(req.nextUrl.searchParams)
-    const nowCOL = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }))
-    const anio = f.anio ?? nowCOL.getFullYear()
-    const mes  = f.mes  ?? (nowCOL.getMonth() + 1)
+    const { anio, mes } = periodoActual(f)
 
-    const baseVals: unknown[] = [anio, mes]
-    const baseExtra: string[] = []
-    if (f.proyecto)         { baseVals.push(f.proyecto);         baseExtra.push(`proyecto_limpio = $${baseVals.length}`) }
-    if (f.director)         { baseVals.push(f.director);         baseExtra.push(`director = $${baseVals.length}`) }
-    if (f.ciudad)           { baseVals.push(f.ciudad);           baseExtra.push(`ciudad = $${baseVals.length}`) }
-    if (f.canal_atribucion) { baseVals.push(f.canal_atribucion); baseExtra.push(`canal_atribucion = $${baseVals.length}`) }
-
-    const extraClause = baseExtra.length ? 'AND ' + baseExtra.join(' AND ') : ''
+    const dim = dimFilters(f, 2)
+    const baseVals: unknown[] = [anio, mes, ...dim.vals]
+    const extraClause = dim.sql
 
     // ── Tiempos por stage ─────────────────────────────────────────────────
     const stageRows = await sql(`

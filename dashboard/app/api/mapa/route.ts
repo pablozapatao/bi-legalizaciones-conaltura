@@ -2,7 +2,7 @@
 // Datos agregados por ciudad_del_negocio para el mapa SVG.
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import sql, { parseFiltros } from '@/lib/db'
+import sql, { parseFiltros, periodoActual, dimFilters, APROBADAS_SQL } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,15 +19,15 @@ const CIUDAD_COORDS: Record<string, { lat: number; lng: number; svgX: number; sv
 export async function GET(req: NextRequest) {
   try {
     const f    = parseFiltros(req.nextUrl.searchParams)
-    const nowCOL = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }))
-    const anio = f.anio ?? nowCOL.getFullYear()
-    const mes  = f.mes  ?? (nowCOL.getMonth() + 1)
+    const { anio, mes } = periodoActual(f)
+    // ciudad no se filtra: el mapa agrupa por ciudad
+    const dim = dimFilters({ ...f, ciudad: null }, 2)
 
     const rows = await sql(`
       SELECT
         ciudad,
         COUNT(*) FILTER (
-          WHERE etapa_codigo IN ('aprobado_exitoso','aprobado_novedades')
+          WHERE etapa_codigo IN (${APROBADAS_SQL})
             AND anio=$1 AND mes=$2
         )                                                        AS aprobadas,
         COUNT(*) FILTER (
@@ -44,9 +44,10 @@ export async function GET(req: NextRequest) {
         ), 0)                                                    AS suma_valor
       FROM raw_legalizaciones
       WHERE ciudad IS NOT NULL AND ciudad <> ''
+        ${dim.sql}
       GROUP BY ciudad
       ORDER BY aprobadas DESC
-    `, [anio, mes])
+    `, [anio, mes, ...dim.vals])
 
     const ciudades = rows.map(r => {
       const coords = CIUDAD_COORDS[r.ciudad] ?? { lat: 4, lng: -74, svgX: 190, svgY: 290 }

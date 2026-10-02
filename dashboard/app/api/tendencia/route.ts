@@ -1,7 +1,7 @@
 // GET /api/tendencia?proyecto=...&director=...&ciudad=...&meses=14
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import sql, { parseFiltros } from '@/lib/db'
+import sql, { parseFiltros, dimFilters } from '@/lib/db'
 import { MES_NAMES } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -10,14 +10,11 @@ export async function GET(req: NextRequest) {
   try {
     const params  = req.nextUrl.searchParams
     const f       = parseFiltros(params)
-    const periodos = Number(params.get('meses') ?? 14)
+    const periodos = Math.min(60, Math.max(1, Number(params.get('meses') ?? 14) || 14))
 
-    const vals: unknown[] = []
-    const extra: string[] = []
-    if (f.proyecto)         { vals.push(f.proyecto);         extra.push(`r.proyecto_limpio = $${vals.length}`) }
-    if (f.director)         { vals.push(f.director);         extra.push(`r.director = $${vals.length}`) }
-    if (f.ciudad)           { vals.push(f.ciudad);           extra.push(`r.ciudad = $${vals.length}`) }
-    if (f.canal_atribucion) { vals.push(f.canal_atribucion); extra.push(`r.canal_atribucion = $${vals.length}`) }
+    const dim  = dimFilters(f, 0)
+    const vals = dim.vals
+    const dimR = dim.sql.replace(/AND (\w+) =/g, 'AND r.$1 =')
 
     // Serie de resolución mensual (cohorte B)
     const resRows = await sql(`
@@ -25,11 +22,12 @@ export async function GET(req: NextRequest) {
         r.anio, r.mes,
         COUNT(*) FILTER (WHERE r.etapa_codigo = 'aprobado_exitoso')   AS exitosas,
         COUNT(*) FILTER (WHERE r.etapa_codigo = 'aprobado_novedades') AS con_novedades,
+        COUNT(*) FILTER (WHERE r.etapa_codigo = 'aprobado_gerencia')  AS aprobado_gerencia,
         COUNT(*) FILTER (WHERE r.etapa_codigo = 'negocio_rechazado')  AS rechazadas
       FROM raw_legalizaciones r
       WHERE r.grupo = 'resolucion'
         AND r.anio IS NOT NULL
-        ${extra.length ? 'AND ' + extra.join(' AND ') : ''}
+        ${dimR}
       GROUP BY r.anio, r.mes
       ORDER BY r.anio DESC, r.mes DESC
       LIMIT $${vals.length + 1}
@@ -42,17 +40,17 @@ export async function GET(req: NextRequest) {
         COUNT(*) AS ventas_caidas
       FROM raw_legalizaciones
       WHERE anio_caida IS NOT NULL
-        ${f.proyecto ? `AND proyecto_limpio = $1` : ''}
+        ${dim.sql}
       GROUP BY anio_caida, mes_caida
-    `, f.proyecto ? [f.proyecto] : [])
+    `, vals)
 
     // Pipeline snapshot (sin fecha madre) — solo 1 número global
     const pipeRows = await sql(`
       SELECT COUNT(*) AS pipeline_activo
       FROM raw_legalizaciones
       WHERE fecha_aprobacion_final IS NULL AND grupo = 'pipeline'
-        ${f.proyecto ? `AND proyecto_limpio = $1` : ''}
-    `, f.proyecto ? [f.proyecto] : [])
+        ${dim.sql}
+    `, vals)
 
     const pipeActivo = Number(pipeRows[0].pipeline_activo)
 
@@ -66,7 +64,8 @@ export async function GET(req: NextRequest) {
       const exitosas   = Number(r.exitosas)
       const novedades  = Number(r.con_novedades)
       const rechazadas = Number(r.rechazadas)
-      const aprobadas  = exitosas + novedades
+      const gerencia   = Number(r.aprobado_gerencia)
+      const aprobadas  = exitosas + novedades + gerencia
       const meta       = metaMap.get(key) ?? 0
       return {
         anio:             Number(r.anio),
@@ -75,6 +74,7 @@ export async function GET(req: NextRequest) {
         aprobadas,
         exitosas,
         con_novedades:    novedades,
+        aprobado_gerencia: gerencia,
         rechazadas,
         ventas_caidas:    caidaMap.get(key) ?? 0,
         pipeline_activo:  pipeActivo,   // snapshot actual (igual para todos)

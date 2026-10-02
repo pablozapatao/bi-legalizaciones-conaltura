@@ -3,7 +3,7 @@
 // agrupadas por proyecto, con los clientes individuales.
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import sql, { parseFiltros } from '@/lib/db'
+import sql, { parseFiltros, periodoActual, dimFilters } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,16 +11,11 @@ export async function GET(req: NextRequest) {
   try {
     const params = req.nextUrl.searchParams
     const f      = parseFiltros(params)
-    const nowCOL = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }))
-    const anio   = f.anio ?? nowCOL.getFullYear()
-    const mes    = f.mes  ?? (nowCOL.getMonth() + 1)
+    const { anio, mes } = periodoActual(f)
 
-    const eVals: unknown[]  = []
-    const eWhere: string[]  = []
-    if (f.proyecto) { eVals.push(f.proyecto); eWhere.push(`AND proyecto_limpio = $${eVals.length + 2}`) }
-    if (f.director) { eVals.push(f.director); eWhere.push(`AND director        = $${eVals.length + 2}`) }
-    if (f.ciudad)   { eVals.push(f.ciudad);   eWhere.push(`AND ciudad          = $${eVals.length + 2}`) }
-    const extras = eWhere.join(' ')
+    const dim    = dimFilters(f, 2)
+    const extras = dim.sql
+    const eVals  = dim.vals
 
     // ── Resumen por proyecto ───────────────────────────────────────────────
     const resumen = await sql(`

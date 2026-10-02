@@ -2,7 +2,7 @@
 // Incluye KPI de "aprobado_gerencia" (Gerencia Comercial — stage 1394950689)
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import sql, { parseFiltros } from '@/lib/db'
+import sql, { parseFiltros, periodoActual, dimFilters } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,18 +10,11 @@ export async function GET(req: NextRequest) {
   try {
     const params = req.nextUrl.searchParams
     const f      = parseFiltros(params)
-    const nowCOL = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }))
-    const anio   = f.anio ?? nowCOL.getFullYear()
-    const mes    = f.mes  ?? (nowCOL.getMonth() + 1)
+    const { anio, mes } = periodoActual(f)
 
-    // Filtros opcionales
-    const eVals: unknown[] = []
-    const eWhere: string[] = []
-    if (f.proyecto)         { eVals.push(f.proyecto);         eWhere.push(`AND proyecto_limpio  = $${eVals.length + 2}`) }
-    if (f.director)         { eVals.push(f.director);         eWhere.push(`AND director          = $${eVals.length + 2}`) }
-    if (f.ciudad)           { eVals.push(f.ciudad);           eWhere.push(`AND ciudad            = $${eVals.length + 2}`) }
-    if (f.canal_atribucion) { eVals.push(f.canal_atribucion); eWhere.push(`AND canal_atribucion  = $${eVals.length + 2}`) }
-    const extras = eWhere.join(' ')
+    const dim    = dimFilters(f, 2)
+    const extras = dim.sql
+    const eVals  = dim.vals
 
     // ── KPIs resolución — todos los stages del grupo 'resolucion' ─────────
     const kpiRows = await sql(`
@@ -45,18 +38,14 @@ export async function GET(req: NextRequest) {
     `, [anio, mes, ...eVals])
 
     // ── Ventas caídas ──────────────────────────────────────────────────────
-    const cVals: unknown[] = []
-    const cWhere: string[] = []
-    if (f.proyecto) { cVals.push(f.proyecto); cWhere.push(`AND proyecto_limpio = $${cVals.length + 2}`) }
-    if (f.director) { cVals.push(f.director); cWhere.push(`AND director        = $${cVals.length + 2}`) }
-    if (f.ciudad)   { cVals.push(f.ciudad);   cWhere.push(`AND ciudad          = $${cVals.length + 2}`) }
+    const cDim = dimFilters(f, 2)
 
     const caidaRows = await sql(`
       SELECT COUNT(*) AS ventas_caidas
       FROM raw_legalizaciones
       WHERE anio_caida = $1 AND mes_caida = $2
-        ${cWhere.join(' ')}
-    `, [anio, mes, ...cVals])
+        ${cDim.sql}
+    `, [anio, mes, ...cDim.vals])
 
     // ── Meta ───────────────────────────────────────────────────────────────
     const metaRows = await sql(`
@@ -79,7 +68,7 @@ export async function GET(req: NextRequest) {
       total_resolucion:      Number(kpi.total_resolucion),
       aprobadas_exitoso:     exitoso,
       aprobadas_novedades:   novedades,
-      aprobadas_gerencia:    gerencia,   // ← NUEVO
+      aprobadas_gerencia:    gerencia,
       rechazadas:            Number(kpi.rechazadas),
       ventas_caidas:         Number(caidaRows[0].ventas_caidas),
       en_ventana_cierre:     ventana,
